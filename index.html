@@ -1,0 +1,1994 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code 夺舍平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dragula@3.7.3/dist/dragula.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dragula@3.7.3/dist/dragula.min.css">
+    <style>
+        .json-viewer {
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        
+        /* JSON语法高亮样式 */
+        .json-container {
+            position: relative;
+            background: #ffffff;
+            border: 1px solid #e1e8ed;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .json-header {
+            background: #f8f9fa;
+            color: #374151;
+            padding: 8px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .json-content {
+            padding: 16px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            background: #ffffff;
+        }
+        
+        /* 增强的JSON语法高亮 */
+        .json-string { 
+            color: #032f62; 
+        }
+        .json-number { 
+            color: #d73a49; 
+            font-weight: 600;
+        }
+        .json-boolean { 
+            color: #6f42c1; 
+            font-weight: 600;
+        }
+        .json-null { 
+            color: #6a737d; 
+            font-style: italic;
+        }
+        .json-key { 
+            color: #005cc5; 
+            font-weight: 600;
+        }
+        .json-punctuation { 
+            color: #24292e; 
+            font-weight: 500;
+        }
+        
+        /* 树状显示样式 */
+        .json-tree {
+            font-family: 'JetBrains Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        .json-tree-item {
+            margin: 2px 0;
+        }
+        
+        .json-tree-toggle {
+            cursor: pointer;
+            user-select: none;
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 4px;
+            border-radius: 3px;
+            transition: background-color 0.15s ease;
+        }
+        
+        .json-tree-toggle:hover {
+            background-color: rgba(0, 123, 255, 0.1);
+        }
+        
+        .json-tree-icon {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            margin-right: 6px;
+            transition: transform 0.15s ease;
+            color: #666;
+            transform: rotate(90deg);
+        }
+        
+        .json-tree-collapsed .json-tree-icon {
+            transform: rotate(0deg);
+        }
+        
+        .json-tree-children {
+            margin-left: 20px;
+            border-left: 1px solid #e1e8ed;
+            padding-left: 12px;
+            margin-top: 4px;
+        }
+        
+
+        
+        .json-tree-leaf {
+            margin-left: 12px;
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        /* 移除彩色圆点，直接用key颜色表示类型 */
+        .json-key.key-object { color: #007bff; font-weight: 600; }
+        .json-key.key-array { color: #28a745; font-weight: 600; }
+        .json-key.key-string { color: #6f42c1; font-weight: 600; }
+        .json-key.key-number { color: #dc3545; font-weight: 600; }
+        .json-key.key-boolean { color: #fd7e14; font-weight: 600; }
+        .json-key.key-null { color: #6c757d; font-weight: 600; }
+        
+        /* JSON树状值的交互样式 */
+        .json-tree-value {
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 3px;
+            transition: background-color 0.15s ease;
+            user-select: none;
+        }
+        
+        .json-tree-value:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+            box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+        }
+        
+        .json-tree-value:active {
+            background-color: rgba(59, 130, 246, 0.2);
+        }
+        
+        /* 复制成功提示 */
+        .json-tree-value.copied {
+            background-color: rgba(16, 185, 129, 0.1);
+            box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.3);
+        }
+        
+        .json-mode-toggle {
+            display: flex;
+            gap: 2px;
+        }
+        
+        .json-mode-btn {
+            padding: 3px 6px;
+            background: #e5e7eb;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            border-radius: 3px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        
+        .json-mode-btn:hover {
+            background: #d1d5db;
+        }
+        
+        .json-mode-btn.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        
+        .copy-btn {
+            padding: 3px 6px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            height: 24px;
+        }
+        
+        .copy-btn:hover {
+            background: #2563eb;
+        }
+        
+        .copy-btn.copied {
+            background: #059669;
+        }
+        .record-item:hover {
+            background-color: #f8fafc;
+        }
+        .record-item.selected {
+            background-color: #e2e8f0;
+            border-left: 4px solid #3b82f6;
+        }
+
+        /* 分割线样式 */
+        .resizer {
+            width: 4px;
+            background: #e5e7eb;
+            cursor: col-resize;
+            position: relative;
+            transition: background-color 0.2s ease;
+        }
+
+        .resizer:hover {
+            background: #9ca3af;
+        }
+
+        .resizer:active {
+            background: #6b7280;
+        }
+
+        /* 筛选按钮样式 */
+        .filter-btn {
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 500;
+            border: 1px solid #d1d5db;
+            background: white;
+            color: #6b7280;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+        }
+
+        .filter-btn.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+
+        .resizer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -2px;
+            right: -2px;
+            bottom: 0;
+            background: transparent;
+        }
+
+        /* 全屏模态框样式 */
+        .fullscreen-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            display: none;
+            padding: 20px;
+        }
+
+        .fullscreen-content {
+            background: white;
+            border-radius: 8px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .fullscreen-header {
+            background: #f8f9fa;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .fullscreen-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .fullscreen-body .json-container {
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+
+        .fullscreen-body .json-content {
+            flex: 1 !important;
+            max-height: none !important;
+            height: 100% !important;
+            border: none !important;
+        }
+
+        /* 全屏模式下的Grid布局样式 */
+        .fullscreen-body .sse-table-view > div {
+            height: calc(100vh - 150px) !important;
+            max-height: none !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        
+        .fullscreen-body .sse-table-view > div > div:first-child {
+            flex-shrink: 0 !important;
+        }
+        
+        .fullscreen-body .sse-table-view > div > div:last-child {
+            flex: 1 !important;
+            height: auto !important;
+            max-height: none !important;
+        }
+
+        /* 全屏模式下的其他视图样式 */
+        .fullscreen-body .sse-lines-view,
+        .fullscreen-body .sse-json-view,
+        .fullscreen-body .sse-tree-view {
+            height: calc(100vh - 200px) !important;
+            max-height: none !important;
+            overflow-y: auto !important;
+        }
+
+        .fullscreen-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            font-family: 'JetBrains Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .fullscreen-close {
+            background: #f3f4f6;
+            color: #374151;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .fullscreen-close:hover {
+            background: #e5e7eb;
+        }
+        
+        /* 全屏模式下的容器样式 */
+        .fullscreen-clone {
+            width: 100%;
+            max-width: none;
+            border: none;
+            box-shadow: none;
+            background: #fff;
+        }
+        
+        .fullscreen-clone .json-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: #fff !important;
+            border-bottom: 2px solid #e5e7eb !important;
+            padding: 8px 16px !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 0 !important;
+        }
+        
+        .fullscreen-clone .json-header .flex {
+            gap: 8px;
+        }
+        
+        .fullscreen-clone .json-mode-toggle {
+            gap: 6px;
+        }
+        
+        .fullscreen-clone .json-mode-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        
+        .fullscreen-clone .copy-btn {
+            padding: 6px 8px;
+            min-width: 32px;
+            height: 32px;
+        }
+        
+        /* 全屏模式下的内容区域 */
+        .fullscreen-clone .json-content {
+            padding: 12px 16px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        /* 全屏模式下的树状视图优化 */
+        .fullscreen-clone .json-tree-leaf {
+            margin: 3px 0;
+            margin-left: 12px;
+        }
+        
+        .fullscreen-clone .json-tree-children {
+            margin-left: 20px;
+            padding-left: 12px;
+        }
+        
+        /* SSE表格样式优化 */
+        .sse-table-view table {
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .sse-table-view th {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        
+        .sse-table-view tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .sse-table-view tr:hover {
+            background: #e3f2fd;
+        }
+        
+        .sse-table-view td {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .sse-table-view td:last-child {
+            white-space: normal;
+            word-break: break-word;
+        }
+        
+        /* 配置面板样式 */
+        .config-tab {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .config-tab.active {
+            color: #3b82f6 !important;
+            border-color: #3b82f6 !important;
+        }
+        
+        .config-panel {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* KEY 管理面板样式 */
+        .key-tab {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .key-tab.active {
+            color: #9333ea !important;
+            border-color: #9333ea !important;
+        }
+        
+        .key-panel {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        .platform-enabled:checked + span {
+            color: #059669;
+            font-weight: 500;
+        }
+        
+        .model-item {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 4px;
+            user-select: none;
+        }
+        
+        .model-item:hover {
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+        
+        .model-item.selected {
+            background: #eff6ff;
+            border-color: #3b82f6;
+            color: #1d4ed8;
+        }
+        
+        .model-item.priority {
+            border-color: #0ea5e9;
+        }
+        
+        .drag-over {
+            background: #dbeafe !important;
+            border-color: #3b82f6 !important;
+        }
+        
+        .scene-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            background: #f9fafb;
+        }
+        
+        .scene-item:hover {
+            background: #f3f4f6;
+        }
+        
+        .drag-over {
+            border: 2px solid #3b82f6 !important;
+            background: #dbeafe !important;
+        }
+        
+        .model-item.priority {
+            transition: all 0.2s ease;
+        }
+        
+        .model-item.priority:hover {
+            transform: scale(1.02);
+        }
+        
+        .model-item.dragging {
+            opacity: 0.5;
+        }
+        
+        .drag-placeholder {
+            border: 2px dashed #3b82f6 !important;
+            background: #dbeafe !important;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.8; }
+        }
+        
+        .cursor-grab {
+            cursor: grab;
+        }
+        
+        .cursor-grab:active {
+            cursor: grabbing;
+        }
+        
+        /* Dragula自定义样式 */
+        .dragula-handle {
+            cursor: move;
+            display: inline-block;
+            width: 16px;
+            height: 32px;
+            border-radius: 4px;
+            margin-right: 12px;
+            position: relative;
+        }
+        
+        .dragula-handle::before {
+            content: "⋮⋮";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #718096;
+            font-size: 12px;
+            line-height: 1;
+        }
+        
+        .gu-mirror {
+            position: fixed !important;
+            margin: 0 !important;
+            z-index: 9999 !important;
+            opacity: 0.8;
+            list-style-type: none;
+            pointer-events: none;
+        }
+        
+        .gu-hide {
+            display: none !important;
+        }
+        
+        .gu-unselectable {
+            -webkit-user-select: none !important;
+            -moz-user-select: none !important;
+            -ms-user-select: none !important;
+            user-select: none !important;
+        }
+        
+        .gu-transit {
+            opacity: 0.2;
+        }
+        
+        .no-drag {
+            pointer-events: none;
+        }
+        
+        .model-item-dragula {
+            margin-bottom: 8px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            transition: all 0.2s ease;
+        }
+        
+        .model-item-dragula:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col">
+    <!-- 头部控制区域 -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="px-6 py-5">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <h1 class="text-2xl font-bold text-gray-900 mb-3">Claude Code 夺舍平台</h1>
+                    <p class="text-sm text-gray-600 leading-relaxed max-w-2xl">
+                        使用上有任何疑问，欢迎公众号搜索 "洛小山"留言。<br>
+                        产品仅做学习交流之用，请勿用于违法用途。
+                    </p>
+                </div>
+                <div class="flex items-center space-x-4 ml-6">
+                    <!-- 状态显示 -->
+                    <div class="flex items-center space-x-4 px-3 py-2 bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg">
+                        <div class="flex items-center">
+                            <div class="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></div>
+                            <span class="text-xs font-medium text-gray-700">模式:</span>
+                            <span id="current-work-mode" class="ml-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">Claude Code模式</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                            <span class="text-xs font-medium text-gray-700">状态:</span>
+                            <span id="current-platform-status" class="ml-1 px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">正常运行</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 操作按钮 -->
+                    <button id="config-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        配置
+                    </button>
+                    <button id="key-management-btn" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        KEY
+                    </button>
+                    <button id="clear-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        清空记录
+                    </button>
+                    <button id="logout-btn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        登出
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主内容区域 -->
+    <div class="flex-1 flex overflow-hidden" id="main-container">
+        <!-- 左侧API调用列表 -->
+        <div class="bg-white flex flex-col" id="left-panel" style="width: 33.333%">
+            <div class="p-4 border-b bg-gray-50">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-semibold text-gray-800">API 调用记录</h2>
+                    <div class="flex items-center space-x-4">
+                        <p class="text-sm text-gray-600">共 <span id="total-count">0</span> 条记录</p>
+                        <!-- HTTP方法筛选 -->
+                        <div class="flex items-center space-x-1">
+                            <span class="text-xs text-gray-500 mr-2">筛选:</span>
+                            <button class="filter-btn active" data-method="all" onclick="monitor.filterByMethod('all')">
+                                全部
+                            </button>
+                            <button class="filter-btn" data-method="GET" onclick="monitor.filterByMethod('GET')">
+                                GET
+                            </button>
+                            <button class="filter-btn" data-method="POST" onclick="monitor.filterByMethod('POST')">
+                                POST
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="records-list" class="flex-1 overflow-y-auto">
+                <div id="no-records" class="p-8 text-center text-gray-500">
+                    暂无API调用记录
+                </div>
+            </div>
+        </div>
+
+        <!-- 分割线 -->
+        <div class="resizer" id="resizer"></div>
+
+        <!-- 右侧详情面板 -->
+        <div class="bg-white flex flex-col" id="right-panel" style="flex: 1">
+            <div class="p-4 border-b bg-gray-50">
+                <h2 class="text-lg font-semibold text-gray-800">调用详情</h2>
+            </div>
+            <div id="detail-content" class="flex-1 overflow-y-auto p-6">
+                <div class="text-center text-gray-500 mt-20">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p class="mt-2">选择一个API调用查看详细信息</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 配置弹窗 -->
+    <div id="config-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">系统配置</h3>
+                    
+                    <!-- 模式选择开关 -->
+                    <div class="mt-3 mb-3 bg-gray-50 border border-gray-200 rounded-md p-3">
+                        <h4 class="text-base font-medium text-gray-900 mb-2">🎛️ 当前工作模式</h4>
+                        <div class="grid grid-cols-3 gap-2">
+                            <label class="flex items-center p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-100 transition-colors">
+                                <input type="radio" name="work-mode" value="claude_code" id="mode-claude-code" class="mr-2 text-blue-600">
+                                <div>
+                                    <div class="text-sm font-medium text-gray-900">Claude Code模式</div>
+                                    <div class="text-xs text-gray-500">简单代理转发</div>
+                                </div>
+                            </label>
+                            <label class="flex items-center p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-100 transition-colors">
+                                <input type="radio" name="work-mode" value="global_direct" id="mode-global-direct" class="mr-2 text-green-600">
+                                <div>
+                                    <div class="text-sm font-medium text-gray-900">全局直连模式</div>
+                                    <div class="text-xs text-gray-500">手动排序控制</div>
+                                </div>
+                            </label>
+                            <label class="flex items-center p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-100 transition-colors">
+                                <input type="radio" name="work-mode" value="smart_routing" id="mode-smart-routing" class="mr-2 text-purple-600">
+                                <div>
+                                    <div class="text-sm font-medium text-gray-900">小模型路由模式</div>
+                                    <div class="text-xs text-gray-500">智能意图识别</div>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="mt-2 text-xs text-gray-500">
+                            <span class="font-medium">提示：</span>选择一种工作模式后，请在对应的标签页中进行详细配置。
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 配置标签页 -->
+                <div class="px-6 pt-4 border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-6">
+                        <button id="tab-claude-code" class="config-tab whitespace-nowrap py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700">
+                            Claude Code模式
+                        </button>
+                        <button id="tab-global-direct" class="config-tab whitespace-nowrap py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700">
+                            全局直连模式
+                        </button>
+                        <button id="tab-smart-routing" class="config-tab whitespace-nowrap py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700">
+                            小模型路由模式
+                        </button>
+                        <button id="tab-platforms" class="config-tab active whitespace-nowrap py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600">
+                            平台配置
+                        </button>
+                        <button id="tab-system-settings" class="config-tab whitespace-nowrap py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700">
+                            系统设置
+                        </button>
+                        <button id="tab-system-status" class="config-tab whitespace-nowrap py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700">
+                            系统状态
+                        </button>
+                        <button id="tab-about" class="config-tab whitespace-nowrap py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700">
+                            关于
+                        </button>
+                    </nav>
+                </div>
+                
+                <div class="px-6 py-4 overflow-y-auto max-h-[calc(90vh-360px)]">
+                    <!-- 内容底部间距，防止被按钮遮挡 -->
+                    <div class="pb-16">
+                    <!-- 全局平台配置面板 -->
+                    <div id="panel-platforms" class="config-panel space-y-4">
+                        <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+                            <div class="flex items-center mb-2">
+                                <div class="w-3 h-3 bg-orange-500 rounded-full mr-3"></div>
+                                <h4 class="text-lg font-medium text-orange-900">全局平台配置</h4>
+                            </div>
+                            <p class="text-sm text-orange-700">统一配置所有AI平台的API Key和服务地址。这些配置将被所有路由模式共享使用。</p>
+                        </div>
+                        
+                        <!-- 阿里云百炼 -->
+                        <div class="border border-gray-200 rounded-lg p-4 mb-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center space-x-3">
+                                    <h5 class="font-medium text-gray-900">阿里云百炼 (DashScope)</h5>
+                                    <span class="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">云端API</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button id="test-dashscope" class="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded transition-colors">
+                                        测试
+                                    </button>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="dashscope-enabled" class="platform-enabled rounded border-gray-300 text-blue-600">
+                                        <span class="ml-1 text-sm text-gray-600">启用</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                                    <input type="text" id="dashscope-api-key" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" 
+                                           placeholder="输入您的DashScope API Key">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">可用模型</label>
+                                    <div id="dashscope-models" class="text-xs text-gray-500 min-h-[20px]">
+                                        点击测试按钮获取可用模型列表
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- OpenRouter -->
+                        <div class="border border-gray-200 rounded-lg p-4 mb-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center space-x-3">
+                                    <h5 class="font-medium text-gray-900">OpenRouter</h5>
+                                    <span class="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded">多模型聚合</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button id="test-openrouter" class="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded transition-colors">
+                                        测试
+                                    </button>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="openrouter-enabled" class="platform-enabled rounded border-gray-300 text-blue-600">
+                                        <span class="ml-1 text-sm text-gray-600">启用</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                                    <input type="text" id="openrouter-api-key" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" 
+                                           placeholder="输入您的OpenRouter API Key">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">可用模型</label>
+                                    <div id="openrouter-models" class="text-xs text-gray-500 min-h-[20px]">
+                                        点击测试按钮获取可用模型列表
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Ollama -->
+                        <div class="border border-gray-200 rounded-lg p-4 mb-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center space-x-3">
+                                    <h5 class="font-medium text-gray-900">Ollama</h5>
+                                    <span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">本地部署</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button id="test-ollama" class="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded transition-colors">
+                                        测试
+                                    </button>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="ollama-enabled" class="platform-enabled rounded border-gray-300 text-blue-600">
+                                        <span class="ml-1 text-sm text-gray-600">启用</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">服务器地址</label>
+                                    <input type="text" id="ollama-base-url" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" 
+                                           placeholder="http://localhost:11434" value="http://localhost:11434">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">可用模型</label>
+                                    <div id="ollama-models" class="text-xs text-gray-500 min-h-[20px]">
+                                        点击测试按钮获取可用模型列表
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LMStudio -->
+                        <div class="border border-gray-200 rounded-lg p-4 mb-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center space-x-3">
+                                    <h5 class="font-medium text-gray-900">LMStudio</h5>
+                                    <span class="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded">本地GUI</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button id="test-lmstudio" class="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded transition-colors">
+                                        测试
+                                    </button>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="lmstudio-enabled" class="platform-enabled rounded border-gray-300 text-blue-600">
+                                        <span class="ml-1 text-sm text-gray-600">启用</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">服务器地址</label>
+                                    <input type="text" id="lmstudio-base-url" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" 
+                                           placeholder="http://localhost:1234" value="http://localhost:1234">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">可用模型</label>
+                                    <div id="lmstudio-models" class="text-xs text-gray-500 min-h-[20px]">
+                                        点击测试按钮获取可用模型列表
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <h5 class="text-base font-medium text-blue-900">批量操作</h5>
+                                <div class="flex space-x-2">
+                                    <button id="test-all-platforms" class="px-3 py-1 text-sm bg-green-500 hover:bg-green-600 text-white rounded transition-colors">
+                                        测试所有平台
+                                    </button>
+                                    <button id="refresh-all-models" class="px-3 py-1 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors">
+                                        刷新所有模型
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="text-sm text-blue-700">
+                                配置完成后，请测试连接并刷新模型列表。这些模型将在其他配置模式中可用。
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Claude Code模式面板 -->
+                    <div id="panel-claude-code" class="config-panel hidden space-y-4">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center">
+                                    <div class="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+                                    <h4 class="text-lg font-medium text-blue-900">Claude Code 兼容</h4>
+                                </div>
+                                <div id="claude-code-status" class="px-2 py-1 text-xs rounded-full bg-gray-200 text-gray-600">
+                                    未启用
+                                </div>
+                            </div>
+                            <p class="text-sm text-blue-700">将请求转发到支持 Claude Code 的 API 服务。支持多个第三方服务，如 Kimi、通义千问等。</p>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">本地访问路径</label>
+                                <input type="text" id="local-path" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                       placeholder="例如：api/v1/claude-code" value="api/v1/claude-code">
+                                <p class="text-xs text-gray-500 mt-1">完整访问地址：http://127.0.0.1:8000/<span class="font-mono text-blue-600">{本地路径}</span></p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">目标服务器地址</label>
+                                <input type="text" id="target-url" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                       placeholder="输入目标服务器地址" value="https://dashscope.aliyuncs.com/api/v2/apps/claude-code-proxy">
+                                <p class="text-xs text-gray-500 mt-1">所有请求将被转发到此地址</p>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    <span class="text-xs text-gray-600">快速设置：</span>
+                                    <button type="button" class="preset-url-btn text-xs text-blue-600 hover:text-blue-800 hover:underline" 
+                                            data-url="https://api.moonshot.ai/anthropic">Kimi API</button>
+                                    <span class="text-xs text-gray-400">·</span>
+                                    <button type="button" class="preset-url-btn text-xs text-blue-600 hover:text-blue-800 hover:underline" 
+                                            data-url="https://dashscope.aliyuncs.com/api/v2/apps/claude-code-proxy">通义千问 API</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <div class="flex items-start">
+                                <div class="w-5 h-5 text-yellow-600 mr-2 mt-0.5">
+                                    <svg fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    </div>
+                                <div>
+                                    <h5 class="text-sm font-medium text-yellow-800">注意事项</h5>
+                                    <p class="text-xs text-yellow-700 mt-1">此模式将禁用多平台转发功能，所有请求都会直接转发到目标地址。如需使用多平台功能，请选择其他模式。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 全局直连模式面板 -->
+                    <div id="panel-global-direct" class="config-panel hidden space-y-4">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center">
+                                    <div class="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                                    <h4 class="text-lg font-medium text-green-900">全局直连模式</h4>
+                                </div>
+                                <div id="global-direct-status" class="px-2 py-1 text-xs rounded-full bg-gray-200 text-gray-600">
+                                    未启用
+                                </div>
+                            </div>
+                            <p class="text-sm text-green-700">自由配置所有平台的模型优先级，支持拖拽排序和自动降级。当主要模型不可用时，自动切换到下一个可用模型。</p>
+                        </div>
+                        
+                        <!-- 模型优先级配置 -->
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <h5 class="text-base font-medium text-gray-900">模型优先级配置</h5>
+
+                            </div>
+                            <div class="grid grid-cols-2 gap-4" id="dragula-container">
+                                <div>
+                                    <div class="flex items-center justify-between mb-2">
+                                        <h6 class="text-sm font-medium text-gray-700">可用模型</h6>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="text" id="global-model-filter" class="px-2 py-1 text-xs border border-gray-300 rounded w-32" placeholder="搜索模型...">
+                                            <span class="text-xs text-gray-500" id="global-model-count">0 个模型</span>
+                                        </div>
+                                    </div>
+                                    <div id="available-models" class="border border-gray-300 rounded-md p-3 h-64 overflow-y-auto bg-white dragula-container">
+                                        <div class="text-center text-gray-500 text-sm py-8 no-drag">
+                                            请先配置平台并刷新模型列表
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1">💡 点击或拖拽模型到右侧设置优先级</p>
+                                </div>
+                                <div>
+                                    <h6 class="text-sm font-medium text-gray-700 mb-2">
+                                        优先级队列 
+                                        <span class="text-xs text-gray-500">(拖拽排序，从上到下优先级递减)</span>
+                                    </h6>
+                                    <div id="priority-models" class="border-2 border-dashed border-gray-300 rounded-md p-3 h-64 overflow-y-auto bg-white dragula-container">
+                                        <div class="text-center text-gray-400 text-sm py-16 no-drag">
+                                            🎯 将模型拖拽到此处设置优先级<br>
+                                            <span class="text-xs">支持拖拽重新排序</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-green-600 mt-1">✅ 支持拖拽排序，模型不可用时自动降级</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 小模型路由模式面板 -->
+                    <div id="panel-smart-routing" class="config-panel hidden space-y-4">
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center">
+                                    <div class="w-3 h-3 bg-purple-500 rounded-full mr-3"></div>
+                                    <h4 class="text-lg font-medium text-purple-900">小模型路由模式</h4>
+                                </div>
+                                <div id="smart-routing-status" class="px-2 py-1 text-xs rounded-full bg-gray-200 text-gray-600">
+                                    未启用
+                                </div>
+                            </div>
+                            <p class="text-sm text-purple-700">基于用户意图智能选择最合适的模型。系统会分析用户的最后一条消息，自动判断是闲聊、代码修改还是新功能开发，然后路由到对应的专业模型。</p>
+                        </div>
+                        
+                        <!-- 路由模型配置 -->
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <h5 class="text-base font-medium text-gray-900">路由模型配置</h5>
+
+                            </div>
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                                <p class="text-sm text-blue-700 mb-3">💡 意图识别模型用于分析用户意图，建议选择速度快的小模型，支持降级备选</p>
+                                <div class="grid grid-cols-2 gap-4" id="routing-dragula-container">
+                                    <div>
+                                        <div class="flex items-center justify-between mb-2">
+                                            <h6 class="text-sm font-medium text-blue-700">可用路由模型</h6>
+                                            <div class="flex items-center space-x-2">
+                                                <input type="text" id="routing-model-filter" class="px-2 py-1 text-xs border border-blue-300 rounded w-32" placeholder="搜索模型...">
+                                                <span class="text-xs text-gray-500" id="routing-model-count">0 个模型</span>
+                                            </div>
+                                        </div>
+                                        <div id="routing-available-models" class="border border-blue-300 rounded-md p-3 h-64 overflow-y-auto bg-white dragula-container">
+                                            <div class="text-center text-gray-500 text-sm py-8 no-drag">
+                                                请先配置平台并刷新模型列表
+                                            </div>
+                                        </div>
+                                        <p class="text-xs text-blue-600 mt-1">💡 点击或拖拽模型到右侧设置优先级</p>
+                                    </div>
+                                    <div>
+                                        <h6 class="text-sm font-medium text-blue-700 mb-2">
+                                            路由模型优先级 
+                                            <span class="text-xs text-gray-500">(拖拽排序，从上到下优先级递减)</span>
+                                        </h6>
+                                        <div id="routing-priority-models" class="border-2 border-dashed border-blue-300 rounded-md p-3 h-64 overflow-y-auto bg-white dragula-container">
+                                            <div class="text-center text-gray-400 text-sm py-12 no-drag">
+                                                🎯 将路由模型拖拽到此处<br>
+                                                <span class="text-xs">支持拖拽重新排序</span>
+                                            </div>
+                                        </div>
+                                        <p class="text-xs text-blue-600 mt-1">✅ 支持拖拽排序，模型不可用时自动降级</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 场景配置 -->
+                        <div>
+                            <div class="mb-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <h5 class="text-lg font-semibold text-gray-900">智能场景配置</h5>
+                                        <span class="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">自动意图识别</span>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <button id="add-scene-template" class="px-3 py-1.5 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors shadow-sm">
+                                            <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"></path>
+                                            </svg>
+                                            快速模板
+                                        </button>
+                                        <button id="add-scene" class="px-3 py-1.5 text-xs bg-green-500 hover:bg-green-600 text-white rounded-md transition-colors shadow-sm">
+                                            <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"></path>
+                                            </svg>
+                                            添加场景
+                                        </button>
+                                        <button id="restore-default-scenes" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800 border border-gray-300 hover:border-gray-400 rounded-md transition-colors">
+                                            <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
+                                            </svg>
+                                            恢复默认
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-600 leading-relaxed">
+                                    配置不同使用场景的专用模型，系统将根据用户输入自动选择最合适的场景和模型。每个场景可以配置多个模型作为降级选择。
+                                </p>
+                            </div>
+                            
+                            <!-- 场景模板选择器 -->
+                            <div id="scene-template-selector" class="hidden mb-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+                                <div class="p-4 border-b border-gray-100">
+                                    <h6 class="text-sm font-medium text-gray-900 mb-2">选择场景模板</h6>
+                                    <p class="text-xs text-gray-500">快速添加常用场景配置</p>
+                                </div>
+                                <div class="p-4 grid grid-cols-2 gap-3">
+                                    <button class="scene-template-item text-left p-3 border border-gray-200 rounded-md hover:border-blue-300 hover:bg-blue-50 transition-all" data-template="coding">
+                                        <div class="text-sm font-medium text-gray-900">💻 代码开发</div>
+                                        <div class="text-xs text-gray-500 mt-1">编程、调试、代码审查</div>
+                                    </button>
+                                    <button class="scene-template-item text-left p-3 border border-gray-200 rounded-md hover:border-green-300 hover:bg-green-50 transition-all" data-template="chat">
+                                        <div class="text-sm font-medium text-gray-900">💬 日常对话</div>
+                                        <div class="text-xs text-gray-500 mt-1">闲聊、答疑、通用交流</div>
+                                    </button>
+                                    <button class="scene-template-item text-left p-3 border border-gray-200 rounded-md hover:border-purple-300 hover:bg-purple-50 transition-all" data-template="analysis">
+                                        <div class="text-sm font-medium text-gray-900">📊 数据分析</div>
+                                        <div class="text-xs text-gray-500 mt-1">数据处理、统计分析</div>
+                                    </button>
+                                    <button class="scene-template-item text-left p-3 border border-gray-200 rounded-md hover:border-yellow-300 hover:bg-yellow-50 transition-all" data-template="writing">
+                                        <div class="text-sm font-medium text-gray-900">✍️ 文档写作</div>
+                                        <div class="text-xs text-gray-500 mt-1">文档、报告、文案创作</div>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div id="routing-scenes" class="space-y-4">
+                                <!-- 场景将从数据库动态加载 -->
+                            </div>
+                            
+                            <div class="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                                <div class="flex items-start space-x-3">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                        <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h6 class="text-sm font-medium text-blue-900 mb-2">💡 使用指南</h6>
+                                        <div class="space-y-2 text-xs text-blue-800">
+                                            <div class="flex items-start space-x-2">
+                                                <span class="text-blue-600">•</span>
+                                                <span><strong>场景描述：</strong>描述越详细，AI意图识别越准确，建议包含关键词和使用情境</span>
+                                            </div>
+                                            <div class="flex items-start space-x-2">
+                                                <span class="text-blue-600">•</span>
+                                                <span><strong>模型优先级：</strong>多个模型用逗号分隔，系统会按顺序尝试，首选不可用时自动降级</span>
+                                            </div>
+                                            <div class="flex items-start space-x-2">
+                                                <span class="text-blue-600">•</span>
+                                                <span><strong>场景匹配：</strong>系统会分析用户最后一条消息，自动选择最合适的场景和模型</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 系统设置面板 -->
+                    <div id="panel-system-settings" class="config-panel space-y-4 hidden">
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+                            <div class="flex items-center mb-2">
+                                <div class="w-3 h-3 bg-purple-500 rounded-full mr-3"></div>
+                                <h4 class="text-lg font-medium text-purple-900">系统设置</h4>
+                            </div>
+                            <p class="text-sm text-purple-700">配置系统运行参数和调试选项。</p>
+                        </div>
+                        
+                        <!-- DEBUG模式设置 -->
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h5 class="text-sm font-medium text-gray-900">DEBUG模式</h5>
+                                    <p class="text-xs text-gray-600 mt-1">启用后将在浏览器控制台显示详细的调试信息，用于排查问题</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="debug-mode-toggle" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-500 bg-gray-50 rounded p-2">
+                                <strong>注意：</strong>DEBUG模式会输出大量信息，可能影响性能。建议仅在需要排查问题时临时启用。
+                            </div>
+                        </div>
+                        
+                        <!-- 性能监控设置 -->
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h5 class="text-sm font-medium text-gray-900">性能监控</h5>
+                                    <p class="text-xs text-gray-600 mt-1">显示请求处理时间和资源使用情况</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="performance-monitor-toggle" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- 当前DEBUG状态显示 -->
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div class="flex items-center mb-2">
+                                <div class="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                                <h6 class="text-sm font-medium text-blue-900">当前状态</h6>
+                            </div>
+                            <div class="space-y-2 text-xs">
+                                <div class="flex justify-between">
+                                    <span class="text-blue-700">前端DEBUG模式:</span>
+                                    <span id="frontend-debug-status" class="font-medium text-blue-900">关闭</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-blue-700">后端DEBUG模式:</span>
+                                    <span id="backend-debug-status" class="font-medium text-blue-900">关闭</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 系统状态面板 -->
+                    <div id="panel-system-status" class="config-panel space-y-4 hidden">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center">
+                                    <div class="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                                    <h4 class="text-lg font-medium text-green-900">系统状态</h4>
+                                </div>
+                                <button id="refresh-system-status" class="px-3 py-1.5 text-sm bg-green-500 hover:bg-green-600 text-white rounded-md transition-colors flex items-center">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                    </svg>
+                                    手动刷新
+                                </button>
+                            </div>
+                            <p class="text-sm text-green-700">实时系统状态监控，点击刷新按钮获取最新数据。</p>
+                        </div>
+
+                        <!-- 加载状态 -->
+                        <div id="system-status-loading" class="text-center text-gray-500 py-8 hidden">
+                            <svg class="animate-spin mx-auto h-8 w-8 text-green-500 mb-2" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            正在获取系统状态...
+                        </div>
+
+                        <!-- 系统状态内容 -->
+                        <div id="system-status-content" class="space-y-4">
+                            <!-- 基础状态 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                                    <div class="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                                    基础状态
+                                </h5>
+                                <div class="grid grid-cols-2 gap-4 text-xs">
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">工作模式:</span>
+                                            <span id="status-work-mode" class="font-medium">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">多平台转发:</span>
+                                            <span id="status-multi-platform" class="font-medium">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">WebSocket连接:</span>
+                                            <span id="status-websocket" class="font-medium">--</span>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">系统运行时间:</span>
+                                            <span id="status-uptime" class="font-medium">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">最后更新:</span>
+                                            <span id="status-last-update" class="font-medium">--</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 系统资源 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                                    <div class="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
+                                    系统资源
+                                </h5>
+                                <div class="grid grid-cols-2 gap-4 text-xs">
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">CPU使用率:</span>
+                                            <span id="status-cpu" class="font-medium">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">内存使用:</span>
+                                            <span id="status-memory" class="font-medium">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">进程ID:</span>
+                                            <span id="status-pid" class="font-medium">--</span>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Python版本:</span>
+                                            <span id="status-python" class="font-medium">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">线程数:</span>
+                                            <span id="status-threads" class="font-medium">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">打开文件数:</span>
+                                            <span id="status-files" class="font-medium">--</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 网络信息 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                                    <div class="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                                    网络信息
+                                </h5>
+                                <div class="grid grid-cols-2 gap-4 text-xs">
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">主机名:</span>
+                                            <span id="status-hostname" class="font-medium">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">本地IP:</span>
+                                            <span id="status-local-ip" class="font-medium">--</span>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">服务端口:</span>
+                                            <span id="status-port" class="font-medium">8000</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">工作目录:</span>
+                                            <span id="status-workdir" class="font-medium text-xs" title="点击查看完整路径">--</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 数据库状态 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                                    <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                    数据库状态
+                                </h5>
+                                <div class="grid grid-cols-2 gap-4 text-xs">
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">连接状态:</span>
+                                            <span id="status-db-connection" class="font-medium">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">API记录数:</span>
+                                            <span id="status-api-records" class="font-medium">--</span>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">平台配置数:</span>
+                                            <span id="status-platform-configs" class="font-medium">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">模型配置数:</span>
+                                            <span id="status-model-configs" class="font-medium">--</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 今日API统计 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <h5 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                                    <div class="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                                    今日API统计
+                                </h5>
+                                <div class="grid grid-cols-2 gap-4 text-xs">
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">总调用次数:</span>
+                                            <span id="status-total-calls" class="font-medium">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">成功调用:</span>
+                                            <span id="status-success-calls" class="font-medium text-green-600">--</span>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">错误调用:</span>
+                                            <span id="status-error-calls" class="font-medium text-red-600">--</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">成功率:</span>
+                                            <span id="status-success-rate" class="font-medium">--</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                            <div class="flex items-start">
+                                <div class="w-5 h-5 text-yellow-600 mr-2 mt-0.5">
+                                    <svg fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h5 class="text-sm font-medium text-yellow-800">提示</h5>
+                                    <p class="text-xs text-yellow-700 mt-1">系统状态不会自动刷新，点击"手动刷新"按钮获取最新数据。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 关于面板 -->
+                    <div id="panel-about" class="config-panel space-y-4 hidden">
+
+                        <!-- 作者介绍 -->
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <div class="text-center mb-4">
+                                <div class="text-2xl mb-2">👋</div>
+                                <h5 class="text-lg font-semibold text-gray-900">嗨，我是洛小山</h5>
+                                <p class="text-sm text-gray-600 mt-1">白天是个爱折腾的 AI 产品经理，晚上是个快乐的小开发~</p>
+                            </div>
+                        </div>
+
+                        <!-- 配置环境变量 -->
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <h5 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                                <div class="text-xl mr-2">⚙️</div>
+                                快速夺舍命令
+                            </h5>
+                            <p class="text-sm text-gray-600 mb-3">在您的项目目录中执行以下命令：</p>
+                            <div class="bg-gray-900 rounded-lg p-3 relative">
+                                <button id="copy-env-commands" class="absolute top-2 right-2 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors" title="复制命令">
+                                    复制
+                                </button>
+                                <code class="block text-sm text-green-400 font-mono leading-relaxed">
+                                    <div>cd 对应目录</div>
+                                    <div>export ANTHROPIC_BASE_URL=http://127.0.0.1:8000/api/v1/claude-code</div>
+                                    <div>export ANTHROPIC_AUTH_TOKEN=your_key_here</div>
+                                    <div>claude</div>
+                                </code>
+                            </div>
+                        </div>
+
+                        <!-- 工具介绍 -->
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <h5 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                                <div class="text-xl mr-2">🚀</div>
+                                多平台AI模型转发系统
+                            </h5>
+                            <p class="text-sm text-gray-600 leading-relaxed mb-3">
+                                一个功能完整、安全可靠的多平台AI模型智能转发系统，支持认证、智能路由、格式转换和容错降级机制。
+                            </p>
+                            <div class="text-xs text-gray-500 bg-blue-50 rounded-lg p-3">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="flex items-center space-x-1">
+                                        <span class="text-blue-500">🔐</span>
+                                        <span>安全认证系统</span>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <span class="text-green-500">🔌</span>
+                                        <span>多平台支持</span>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <span class="text-purple-500">🧠</span>
+                                        <span>智能路由系统</span>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <span class="text-orange-500">🔄</span>
+                                        <span>格式转换</span>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <span class="text-red-500">🛡️</span>
+                                        <span>容错机制</span>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <span class="text-indigo-500">🎨</span>
+                                        <span>现代化界面</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 支持平台 -->
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <h5 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                                <div class="text-xl mr-2">🔌</div>
+                                支持平台
+                            </h5>
+                            <div class="grid grid-cols-2 gap-3 text-sm text-gray-600">
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-blue-500">☁️</span>
+                                    <span>阿里云百炼 (DashScope)</span>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-purple-500">🌐</span>
+                                    <span>OpenRouter 多模型聚合</span>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-green-500">🐋</span>
+                                    <span>Ollama 本地部署</span>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-orange-500">🖥️</span>
+                                    <span>LMStudio 本地GPU加速</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 工作模式 -->
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <h5 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                                <div class="text-xl mr-2">🧠</div>
+                                智能路由模式
+                            </h5>
+                            <div class="space-y-2 text-sm text-gray-600">
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-blue-500">🔵</span>
+                                    <div>
+                                        <span class="font-medium">Claude Code模式</span>
+                                        <div class="text-xs text-gray-500">纯代理模式，最简单直接</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-green-500">🟢</span>
+                                    <div>
+                                        <span class="font-medium">全局直连模式</span>
+                                        <div class="text-xs text-gray-500">手动控制，支持拖拽排序和优先级</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-purple-500">🟣</span>
+                                    <div>
+                                        <span class="font-medium">小模型路由模式</span>
+                                        <div class="text-xs text-gray-500">智能判断，基于用户意图自动选择</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 核心特性 -->
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <h5 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                                <div class="text-xl mr-2">✨</div>
+                                核心特性
+                            </h5>
+                            <div class="grid grid-cols-2 gap-3 text-sm text-gray-600">
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-blue-500">🔄</span>
+                                    <span>Claude ⟷ OpenAI 格式转换</span>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-green-500">🛡️</span>
+                                    <span>自动降级容错机制</span>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-purple-500">🎛️</span>
+                                    <span>响应式拖拽配置界面</span>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-red-500">🔐</span>
+                                    <span>会话认证和密码保护</span>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-yellow-500">📊</span>
+                                    <span>实时监控和调用统计</span>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-indigo-500">🚀</span>
+                                    <span>高性能异步流式处理</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 技术架构 -->
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <h5 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                                <div class="text-xl mr-2">🔧</div>
+                                技术架构
+                            </h5>
+                            <div class="grid grid-cols-2 gap-3 text-sm text-gray-600">
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-blue-500">🌐</span>
+                                    <span>FastAPI + SQLAlchemy</span>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-green-500">🎨</span>
+                                    <span>Tailwind CSS + JavaScript</span>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-purple-500">💾</span>
+                                    <span>SQLite 轻量级数据库</span>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <span class="text-orange-500">⚡</span>
+                                    <span>asyncio 异步处理</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 联系方式 -->
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <h5 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                                <div class="text-xl mr-2">🏠</div>
+                                联系方式
+                            </h5>
+                            <div class="space-y-2 text-sm text-gray-600">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-blue-500">🌐</span>
+                                    <span>个人网站: </span>
+                                    <a href="https://luoxiaoshan.cn" target="_blank" class="text-blue-600 hover:underline">luoxiaoshan.cn</a>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-green-500">📱</span>
+                                    <span>微信公众号: 洛小山</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-gray-500">📦</span>
+                                    <span>GitHub项目: </span>
+                                    <a href="https://github.com/itshen/redwolf" target="_blank" class="text-blue-600 hover:underline">redwolf</a>
+                                </div>
+                            </div>
+                        </div>
+
+
+
+                        <!-- 反馈与支持 -->
+                        <div class="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+                            <div class="text-center">
+                                <h5 class="text-sm font-medium text-gray-900 mb-2 flex items-center justify-center">
+                                    <div class="text-xl mr-2">🤝</div>
+                                    欢迎交流反馈
+                                </h5>
+                                <p class="text-sm text-gray-600 mb-3">
+                                    专为学习交流而设计的智能API代理工具<br>
+                                    遇到问题或有好想法？欢迎通过公众号"洛小山"留言交流！
+                                </p>
+                                <div class="flex items-center justify-center space-x-4 text-xs text-gray-500">
+                                    <div class="flex items-center space-x-1">
+                                        <span>🔗</span>
+                                        <span>技术支持</span>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <span>📧</span>
+                                        <span>问题反馈</span>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <span>⭐</span>
+                                        <span>开源项目</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 免责声明 -->
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                            <div class="text-center">
+                                <p class="text-xs text-gray-500 mb-1">
+                                    <strong>MIT License</strong> - 本软件仅供学习交流使用
+                                </p>
+                                <p class="text-xs text-gray-400">
+                                    使用者应遵守相关法律法规，作者不承担因使用本软件而产生的任何法律责任
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3 sticky bottom-0 bg-white z-10">
+                    <button id="config-cancel" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
+                        取消
+                    </button>
+                    <button id="config-save" class="px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md transition-colors">
+                        保存配置
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KEY 管理弹窗 -->
+    <div id="key-management-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+                <!-- 头部 -->
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-900">KEY 管理</h3>
+                    <button id="key-management-close" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- 内容 -->
+                <div class="p-6 overflow-y-auto max-h-[calc(90vh-260px)]">
+                    <!-- 标签页 -->
+                    <div class="border-b border-gray-200 mb-6">
+                        <nav class="-mb-px flex space-x-8">
+                            <button id="key-tab-management" class="key-tab active whitespace-nowrap py-2 px-1 border-b-2 border-purple-500 font-medium text-sm text-purple-600">
+                                KEY 管理
+                            </button>
+                            <button id="key-tab-statistics" class="key-tab whitespace-nowrap py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700">
+                                使用统计
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- KEY 管理面板 -->
+                    <div class="pb-16">
+                    <div id="key-panel-management" class="key-panel">
+                        <!-- 添加新 KEY 按钮 -->
+                        <div class="mb-6">
+                            <button id="add-key-btn" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                                新增 KEY
+                            </button>
+                        </div>
+
+                        <!-- KEY 列表 -->
+                        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
+                                <div class="grid grid-cols-12 gap-4 text-sm font-medium text-gray-700">
+                                    <div class="col-span-2">KEY 名称</div>
+                                    <div class="col-span-3">API KEY</div>
+                                    <div class="col-span-1">限制 (万Token)</div>
+                                    <div class="col-span-1">已用 (万Token)</div>
+                                    <div class="col-span-2">到期时间</div>
+                                    <div class="col-span-1">状态</div>
+                                    <div class="col-span-2">操作</div>
+                                </div>
+                            </div>
+                            <div id="key-list" class="divide-y divide-gray-200 overflow-y-auto max-h-96">
+                                <!-- KEY 列表将在这里动态加载 -->
+                                <div class="px-6 py-4 text-center text-gray-500">
+                                    暂无 KEY，点击上方按钮添加
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 使用统计面板 -->
+                    <div id="key-panel-statistics" class="key-panel hidden">
+                        <!-- 时间范围选择 -->
+                        <div class="mb-6 flex items-center space-x-4">
+                            <label class="text-sm font-medium text-gray-700">时间范围：</label>
+                            <select id="stats-time-range" class="border border-gray-300 rounded-md px-3 py-1 text-sm">
+                                <option value="7">最近 7 天</option>
+                                <option value="30" selected>最近 30 天</option>
+                                <option value="90">最近 90 天</option>
+                                <option value="custom">自定义</option>
+                            </select>
+                            <div id="custom-date-range" class="hidden flex items-center space-x-2">
+                                <input type="date" id="stats-start-date" class="border border-gray-300 rounded-md px-2 py-1 text-sm">
+                                <span class="text-sm text-gray-500">至</span>
+                                <input type="date" id="stats-end-date" class="border border-gray-300 rounded-md px-2 py-1 text-sm">
+                            </div>
+                            <button id="refresh-stats-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm transition-colors">
+                                刷新统计
+                            </button>
+                        </div>
+
+                        <!-- 概览统计 -->
+                        <div id="stats-overview" class="grid grid-cols-4 gap-4 mb-6">
+                            <!-- 统计卡片将在这里动态加载 -->
+                        </div>
+
+                        <!-- KEY 详细统计表格 -->
+                        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
+                                <h4 class="text-lg font-medium text-gray-900">KEY 使用详情</h4>
+                            </div>
+                            <div id="key-statistics-table" class="overflow-auto max-h-96">
+                                <!-- 统计表格将在这里动态加载 -->
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+
+                <!-- 底部按钮 -->
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-end sticky bottom-0 bg-white z-10">
+                    <button id="key-management-cancel" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KEY 详细统计弹窗 -->
+    <div id="key-detail-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden" style="z-index: 60;">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+                <!-- 头部 -->
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h3 id="key-detail-title" class="text-lg font-semibold text-gray-900">KEY 详细统计</h3>
+                    <button id="key-detail-close" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- 内容 -->
+                <div class="p-6 overflow-y-auto max-h-[calc(90vh-130px)]">
+                    <div class="pb-16">
+                    <div id="key-detail-content">
+                        <!-- 详细统计内容将在这里动态生成 -->
+                        <div class="text-center text-gray-500 py-8">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            <p class="mt-2">正在加载统计数据...</p>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+
+                <!-- 底部按钮 -->
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-end sticky bottom-0 bg-white z-10">
+                    <button id="key-detail-cancel" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加/编辑 KEY 弹窗 -->
+    <div id="key-form-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+                <!-- 头部 -->
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 id="key-form-title" class="text-lg font-semibold text-gray-900">添加 KEY</h3>
+                </div>
+
+                <!-- 表单 -->
+                <form id="key-form" class="p-6 space-y-4">
+                    <div class="pb-16">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">KEY 名称</label>
+                        <input type="text" id="key-name" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="请输入 KEY 名称" required>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Token 限制 (万Token)</label>
+                        <input type="number" id="key-max-tokens" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="0 表示无限制" min="0" step="0.1">
+                        <p class="text-xs text-gray-500 mt-1">设置 KEY 的最大 Token 使用量，0 表示无限制</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">到期时间</label>
+                        <div class="space-y-2">
+                            <select id="key-expires-preset" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <option value="7">7 天后</option>
+                                <option value="30" selected>30 天后</option>
+                                <option value="180">180 天后</option>
+                                <option value="365">365 天后</option>
+                                <option value="0">永不过期</option>
+                                <option value="custom">自定义日期</option>
+                            </select>
+                            <input type="date" id="key-expires-date" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 hidden">
+                        </div>
+                    </div>
+
+
+                    </div>
+                </form>
+
+                <!-- 底部按钮 -->
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3 sticky bottom-0 bg-white z-10">
+                    <button id="key-form-cancel" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
+                        取消
+                    </button>
+                    <button id="key-form-save" class="px-4 py-2 text-sm font-medium text-white bg-purple-500 hover:bg-purple-600 rounded-md transition-colors">
+                        保存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 全屏查看模态框 -->
+    <div id="fullscreen-modal" class="fullscreen-modal">
+        <div class="fullscreen-content">
+            <div class="fullscreen-header">
+                <h3 id="fullscreen-title" class="text-lg font-semibold text-gray-900">全屏查看</h3>
+                <div class="fullscreen-actions">
+                    <div id="fullscreen-buttons" class="flex items-center gap-2"></div>
+                    <button id="fullscreen-close" class="fullscreen-close">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="fullscreen-body" class="fullscreen-body"></div>
+        </div>
+    </div>
+
+    <script src="/static/monitor.js"></script>
+    <script src="/static/key_manager.js"></script>
+</body>
+</html>
