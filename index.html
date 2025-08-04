@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claude Code 夺舍平台</title>
+    <title>红狼 Claude Code 夺舍平台</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/dragula@3.7.3/dist/dragula.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dragula@3.7.3/dist/dragula.min.css">
@@ -584,6 +584,160 @@
             cursor: grabbing;
         }
         
+        /* 开屏提示样式 */
+        .welcome-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        .welcome-modal {
+            background: white;
+            border-radius: 16px;
+            max-width: 800px;
+            width: 95%;
+            max-height: 85vh;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: slideIn 0.3s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        .welcome-header {
+            text-align: center;
+            padding: 40px 48px 0 48px;
+        }
+        
+        .welcome-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 12px;
+        }
+        
+        .welcome-subtitle {
+            color: #6b7280;
+            font-size: 18px;
+        }
+        
+        .welcome-content {
+            line-height: 1.7;
+            color: #374151;
+            padding: 40px 48px;
+            flex: 1;
+            overflow-y: auto;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
+        }
+        
+        .welcome-content::-webkit-scrollbar {
+            display: none; /* Chrome/Safari/Webkit */
+        }
+        
+        .welcome-content h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+            margin: 24px 0 16px 0;
+        }
+        
+        .welcome-content p {
+            margin-bottom: 16px;
+            font-size: 15px;
+        }
+        
+        .welcome-highlight {
+            background: #fef3c7;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #f59e0b;
+            margin: 24px 0;
+            font-size: 15px;
+        }
+        
+        .welcome-buttons {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 24px 48px 40px 48px;
+            border-top: 1px solid #f3f4f6;
+            background: white;
+            border-radius: 0 0 16px 16px;
+        }
+        
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+            padding: 14px 28px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 15px;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+            padding: 14px 28px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 15px;
+            transition: all 0.2s;
+        }
+        
+        .btn-secondary:hover {
+            background: #e5e7eb;
+            transform: translateY(-1px);
+        }
+        
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .checkbox-container input[type="checkbox"] {
+            transform: scale(1.3);
+            margin: 0;
+        }
+        
+        .checkbox-container label {
+            color: #6b7280;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        
         /* Dragula自定义样式 */
         .dragula-handle {
             cursor: move;
@@ -649,12 +803,62 @@
     </style>
 </head>
 <body class="bg-gray-100 h-screen flex flex-col">
+    <!-- 开屏欢迎提示 -->
+    <div id="welcome-overlay" class="welcome-overlay" style="display: none;">
+        <div class="welcome-modal">
+            <div class="welcome-header">
+                <div class="welcome-title">🎉 欢迎使用红狼 Claude Code 夺舍平台</div>
+            </div>
+            
+            <div class="welcome-content">
+                <p>请你尽快在右上角创建一个你自己的 <strong>KEY</strong>，然后点击<strong>配置</strong>，选择对应的转发模式，并配置好对应 KEY。</p>
+                
+                <h5 class="text-base font-medium text-gray-900 mb-4 flex items-center mt-6">
+                    <div class="text-xl mr-3">⚙️</div>
+                    快速夺舍命令
+                </h5>
+                <p class="text-sm text-gray-600 mb-4">在您的项目目录中执行以下命令：</p>
+                <div class="bg-gray-900 rounded-lg p-4 relative mb-6">
+                    <button id="copy-welcome-commands" class="absolute top-2 right-2 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors" title="复制命令" onclick="copyWelcomeCommands()">
+                        复制
+                    </button>
+                    <code class="block text-sm text-green-400 font-mono leading-relaxed">
+                        <div>cd 对应目录</div>
+                        <div>export ANTHROPIC_BASE_URL=http://127.0.0.1:8000/api/v1/claude-code</div>
+                        <div>export ANTHROPIC_AUTH_TOKEN=your_key_here</div>
+                        <div>claude</div>
+                    </code>
+                </div>
+                
+                <div class="welcome-highlight">
+                    <strong>⚠️ 重要提示：</strong><br>
+                    • 你必须使用 <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: #e11d48; font-weight: 600;">lxs_</code> 开头的 Key 使用 Claude Code<br>
+                    • 不能使用 <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: #6b7280;">sk-</code> 开头的 key，
+                    <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: #6b7280;">sk-</code> 开头的 key 应该要配置到系统里
+                </div>
+                
+                <p>如果有疑问，请公众号搜索 <strong>"洛小山"</strong> 获取技术支持。</p>
+            </div>
+            
+            <div class="welcome-buttons">
+                <div class="checkbox-container">
+                    <input type="checkbox" id="dont-show-again">
+                    <label for="dont-show-again">不再显示此提示</label>
+                </div>
+                <div>
+                    <button class="btn-secondary" onclick="closeWelcome()">稍后再说</button>
+                    <button class="btn-primary" onclick="closeWelcomeAndOpenConfig()">立即配置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 头部控制区域 -->
     <div class="bg-white shadow-sm border-b">
         <div class="px-6 py-5">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
-                    <h1 class="text-2xl font-bold text-gray-900 mb-3">Claude Code 夺舍平台</h1>
+                    <h1 class="text-2xl font-bold text-gray-900 mb-3">红狼 Claude Code 夺舍平台</h1>
                     <p class="text-sm text-gray-600 leading-relaxed max-w-2xl">
                         使用上有任何疑问，欢迎公众号搜索 "洛小山"留言。<br>
                         产品仅做学习交流之用，请勿用于违法用途。
@@ -1065,7 +1269,7 @@
                                     未启用
                                 </div>
                             </div>
-                            <p class="text-sm text-green-700">自由配置所有平台的模型优先级，支持拖拽排序和自动降级。当主要模型不可用时，自动切换到下一个可用模型。</p>
+                            <p class="text-sm text-green-700">可以将 Claude Code 的请求路由到千问、OpenRouter、Ollama或LMStudio中，便于你测试不同的模型。<br>你可以自由配置平台的模型优先级，支持拖拽排序和自动降级。当主要模型不可用时，自动切换到下一个可用模型。</p>
                         </div>
                         
                         <!-- 模型优先级配置 -->
@@ -1119,7 +1323,7 @@
                                     未启用
                                 </div>
                             </div>
-                            <p class="text-sm text-purple-700">基于用户意图智能选择最合适的模型。系统会分析用户的最后一条消息，自动判断是闲聊、代码修改还是新功能开发，然后路由到对应的专业模型。</p>
+                            <p class="text-sm text-purple-700">基于用户意图智能选择最合适的模型，帮助你降低使用成本。<br>系统会分析用户的最后一条消息，自动判断是闲聊、代码修改还是新功能开发，然后路由到对应的专业模型。</p>
                         </div>
                         
                         <!-- 路由模型配置 -->
@@ -2073,6 +2277,74 @@
             </div>
         </div>
     </div>
+
+    <script>
+        // 开屏提示相关功能
+        function showWelcome() {
+            document.getElementById('welcome-overlay').style.display = 'flex';
+        }
+
+        function closeWelcome() {
+            const dontShowAgain = document.getElementById('dont-show-again').checked;
+            if (dontShowAgain) {
+                localStorage.setItem('hideWelcome', 'true');
+            }
+            document.getElementById('welcome-overlay').style.display = 'none';
+        }
+
+        function closeWelcomeAndOpenConfig() {
+            closeWelcome();
+            // 触发配置按钮的点击事件
+            setTimeout(() => {
+                document.getElementById('config-btn').click();
+            }, 300);
+        }
+
+        function copyWelcomeCommands() {
+            const commands = `cd 对应目录
+export ANTHROPIC_BASE_URL=http://127.0.0.1:8000/api/v1/claude-code
+export ANTHROPIC_AUTH_TOKEN=your_key_here
+claude`;
+            
+            navigator.clipboard.writeText(commands).then(() => {
+                const button = document.getElementById('copy-welcome-commands');
+                const originalText = button.textContent;
+                button.textContent = '已复制';
+                button.style.backgroundColor = '#059669';
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.backgroundColor = '';
+                }, 2000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+                alert('复制失败，请手动复制命令');
+            });
+        }
+
+        // 页面加载完成后检查是否需要显示开屏提示
+        document.addEventListener('DOMContentLoaded', function() {
+            const hideWelcome = localStorage.getItem('hideWelcome');
+            if (!hideWelcome) {
+                // 延迟500ms显示，让页面加载完成
+                setTimeout(showWelcome, 500);
+            }
+        });
+
+        // 点击遮罩层关闭（可选功能）
+        document.getElementById('welcome-overlay').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeWelcome();
+            }
+        });
+
+        // ESC键关闭
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.getElementById('welcome-overlay').style.display === 'flex') {
+                closeWelcome();
+            }
+        });
+    </script>
 
     <script src="/static/monitor.js"></script>
     <script src="/static/key_manager.js"></script>
