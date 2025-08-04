@@ -992,19 +992,49 @@
                                 <p class="text-xs text-gray-500 mt-1">完整访问地址：http://127.0.0.1:8000/<span class="font-mono text-blue-600">{本地路径}</span></p>
                             </div>
                             
+                            <!-- 多服务器配置 -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">目标服务器地址</label>
+                                <div class="flex items-center justify-between mb-3">
+                                    <label class="block text-sm font-medium text-gray-700">Claude Code 服务器列表</label>
+                                    <button type="button" id="add-claude-server-btn" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                        </svg>
+                                        添加服务器
+                                    </button>
+                                </div>
+                                
+                                <!-- 服务器列表容器 -->
+                                <div id="claude-servers-list" class="space-y-3 min-h-[100px] border-2 border-dashed border-gray-200 rounded-lg p-3">
+                                    <div id="claude-servers-empty" class="text-center text-gray-500 text-sm py-6">
+                                        <svg class="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                                        </svg>
+                                        <p>暂无服务器配置</p>
+                                        <p class="text-xs text-gray-400 mt-1">点击上方按钮添加您的第一个服务器</p>
+                                    </div>
+                                </div>
+                                
+                                <p class="text-xs text-gray-500 mt-2">💡 提示：拖拽服务器卡片可以调整优先级顺序。当前面的服务器失败时，会自动切换到后面的服务器。</p>
+                            </div>
+                            
+                            <!-- 传统单服务器配置（兼容性，隐藏） -->
+                            <div id="legacy-server-config" class="hidden">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">目标服务器地址（传统模式）</label>
                                 <input type="text" id="target-url" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
                                        placeholder="输入目标服务器地址" value="https://dashscope.aliyuncs.com/api/v2/apps/claude-code-proxy">
                                 <p class="text-xs text-gray-500 mt-1">所有请求将被转发到此地址</p>
-                                <div class="mt-2 flex flex-wrap gap-2">
-                                    <span class="text-xs text-gray-600">快速设置：</span>
-                                    <button type="button" class="preset-url-btn text-xs text-blue-600 hover:text-blue-800 hover:underline" 
-                                            data-url="https://api.moonshot.ai/anthropic">Kimi API</button>
-                                    <span class="text-xs text-gray-400">·</span>
-                                    <button type="button" class="preset-url-btn text-xs text-blue-600 hover:text-blue-800 hover:underline" 
-                                            data-url="https://dashscope.aliyuncs.com/api/v2/apps/claude-code-proxy">通义千问 API</button>
-                                </div>
+                                                   <div class="mt-2 flex flex-wrap gap-2">
+                       <span class="text-xs text-gray-600">快速设置：</span>
+                       <button type="button" class="preset-url-btn text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                               data-url="https://api.moonshot.ai/anthropic">Kimi API</button>
+                       <span class="text-xs text-gray-400">·</span>
+                       <button type="button" class="preset-url-btn text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                               data-url="https://dashscope.aliyuncs.com/api/v2/apps/claude-code-proxy">通义千问 API</button>
+                       <span class="text-xs text-gray-400">·</span>
+                       <button type="button" class="preset-url-btn text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                               data-url="https://open.bigmodel.cn/api/anthropic">智谱 API</button>
+                   </div>
                             </div>
                         </div>
                         
@@ -1985,6 +2015,62 @@
                 </div>
             </div>
             <div id="fullscreen-body" class="fullscreen-body"></div>
+        </div>
+    </div>
+
+    <!-- Claude Code 服务器添加/编辑模态框 -->
+    <div id="claude-server-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 id="claude-server-modal-title" class="text-lg font-medium text-gray-900">添加服务器</h3>
+                </div>
+                <form id="claude-server-form" class="px-6 py-4 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">服务器名称 *</label>
+                        <input type="text" id="claude-server-name" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                               placeholder="例如：Kimi主服务器" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">服务器地址 *</label>
+                        <input type="url" id="claude-server-url" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                               placeholder="https://api.moonshot.ai/anthropic" required>
+                                                   <div class="mt-2 flex flex-wrap gap-2">
+                               <span class="text-xs text-gray-600">快速设置：</span>
+                               <button type="button" class="preset-server-url-btn text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                                       data-url="https://api.moonshot.ai/anthropic">Kimi API</button>
+                               <span class="text-xs text-gray-400">·</span>
+                               <button type="button" class="preset-server-url-btn text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                                       data-url="https://dashscope.aliyuncs.com/api/v2/apps/claude-code-proxy">通义千问 API</button>
+                               <span class="text-xs text-gray-400">·</span>
+                               <button type="button" class="preset-server-url-btn text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                                       data-url="https://open.bigmodel.cn/api/anthropic">智谱 API</button>
+                           </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                        <input type="text" id="claude-server-api-key" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                               placeholder="可选，某些服务器需要">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">超时时间 (秒)</label>
+                        <input type="number" id="claude-server-timeout" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                               value="600" min="1" max="3600">
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="claude-server-enabled" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                        <label for="claude-server-enabled" class="ml-2 block text-sm text-gray-900">启用此服务器</label>
+                    </div>
+                </form>
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                    <button type="button" id="claude-server-modal-cancel" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        取消
+                    </button>
+                    <button type="submit" form="claude-server-form" id="claude-server-modal-save" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        保存
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 

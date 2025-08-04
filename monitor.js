@@ -59,6 +59,26 @@ class APIHookMonitor {
         this.currentWorkMode = document.getElementById('current-work-mode');
         this.currentPlatformStatus = document.getElementById('current-platform-status');
         
+        // Claude Code 服务器管理相关元素
+        this.addClaudeServerBtn = document.getElementById('add-claude-server-btn');
+        this.claudeServersList = document.getElementById('claude-servers-list');
+        this.claudeServersEmpty = document.getElementById('claude-servers-empty');
+        this.claudeServerModal = document.getElementById('claude-server-modal');
+        this.claudeServerModalTitle = document.getElementById('claude-server-modal-title');
+        this.claudeServerForm = document.getElementById('claude-server-form');
+        this.claudeServerModalCancel = document.getElementById('claude-server-modal-cancel');
+        this.claudeServerModalSave = document.getElementById('claude-server-modal-save');
+        
+        // Claude Code 服务器表单字段
+        this.claudeServerNameInput = document.getElementById('claude-server-name');
+        this.claudeServerUrlInput = document.getElementById('claude-server-url');
+        this.claudeServerApiKeyInput = document.getElementById('claude-server-api-key');
+        this.claudeServerTimeoutInput = document.getElementById('claude-server-timeout');
+        this.claudeServerEnabledInput = document.getElementById('claude-server-enabled');
+        
+        // 当前编辑的服务器ID（编辑模式下使用）
+        this.currentEditingServerId = null;
+        
         // 分割线相关元素
         this.mainContainer = document.getElementById('main-container');
         this.leftPanel = document.getElementById('left-panel');
@@ -88,7 +108,36 @@ class APIHookMonitor {
                     console.log(`✅ [Frontend] 已设置预设服务器地址: ${presetUrl}`);
                 }
             }
+            
+            // Claude Code 服务器模态框中的预设服务器地址按钮
+            if (e.target.classList.contains('preset-server-url-btn')) {
+                const presetUrl = e.target.dataset.url;
+                if (presetUrl && this.claudeServerUrlInput) {
+                    this.claudeServerUrlInput.value = presetUrl;
+                    console.log(`✅ [Frontend] 模态框中已设置预设服务器地址: ${presetUrl}`);
+                }
+            }
         });
+        
+        // Claude Code 服务器管理事件
+        if (this.addClaudeServerBtn) {
+            this.addClaudeServerBtn.addEventListener('click', () => this.showAddClaudeServerModal());
+        }
+        if (this.claudeServerModalCancel) {
+            this.claudeServerModalCancel.addEventListener('click', () => this.hideClaudeServerModal());
+        }
+        if (this.claudeServerForm) {
+            this.claudeServerForm.addEventListener('submit', (e) => this.saveClaudeServer(e));
+        }
+        
+        // 模态框背景点击关闭
+        if (this.claudeServerModal) {
+            this.claudeServerModal.addEventListener('click', (e) => {
+                if (e.target === this.claudeServerModal) {
+                    this.hideClaudeServerModal();
+                }
+            });
+        }
         
         // 复制环境变量命令事件
         document.addEventListener('click', (e) => {
@@ -456,6 +505,9 @@ class APIHookMonitor {
             console.log('💾 [Frontend] 多平台转发设置:', config.use_multi_platform || false);
             
             this.updateConfigDisplay(config);
+            
+            // 加载Claude Code服务器列表
+            await this.loadClaudeServers();
         } catch (error) {
             console.error('加载配置失败:', error);
         }
@@ -5931,8 +5983,14 @@ class APIHookMonitor {
     
     // 更新系统状态显示
     updateSystemStatusDisplay(statusData) {
-        // 基础状态
-        this.updateElementText('status-work-mode', statusData.workMode || '--');
+        // 基础状态 - 将英文工作模式转换为中文显示
+        const modeNames = {
+            'claude_code': 'Claude Code模式',
+            'global_direct': '全局直连模式',
+            'smart_routing': '小模型路由模式'
+        };
+        const workModeDisplay = modeNames[statusData.workMode] || statusData.workMode || '--';
+        this.updateElementText('status-work-mode', workModeDisplay);
         this.updateElementText('status-multi-platform', statusData.multiPlatform || '--');
         this.updateElementText('status-websocket', statusData.websocket || '--');
         this.updateElementText('status-uptime', statusData.uptime || '--');
@@ -6041,6 +6099,322 @@ class APIHookMonitor {
                 }
             }, 300);
         }, 3000);
+    }
+
+    // 获取当前配置
+    getCurrentConfig() {
+        return {
+            local_path: this.localPathInput?.value || 'api/v1/claude-code',
+            target_url: this.targetUrlInput?.value || ''
+        };
+    }
+
+    // ==================== Claude Code 服务器管理方法 ====================
+    
+    async loadClaudeServers() {
+        try {
+            const response = await fetch('/_api/claude-code-servers');
+            if (response.ok) {
+                const servers = await response.json();
+                console.log('✅ [Frontend] Claude Code服务器列表加载成功:', servers);
+                this.renderClaudeServers(servers);
+            } else {
+                console.error('❌ [Frontend] Claude Code服务器列表加载失败:', response.statusText);
+            }
+        } catch (error) {
+            console.error('❌ [Frontend] Claude Code服务器列表加载出错:', error);
+        }
+    }
+    
+    renderClaudeServers(servers) {
+        if (!this.claudeServersList || !this.claudeServersEmpty) return;
+        
+        // 清空现有列表
+        this.claudeServersList.innerHTML = '';
+        
+        if (servers.length === 0) {
+            // 显示空状态
+            this.claudeServersList.appendChild(this.claudeServersEmpty);
+            return;
+        }
+        
+        // 渲染服务器卡片
+        servers.forEach((server, index) => {
+            const serverCard = this.createServerCard(server, index);
+            this.claudeServersList.appendChild(serverCard);
+        });
+        
+        // 初始化拖拽排序
+        this.initServerDragSort();
+    }
+    
+    createServerCard(server, index) {
+        const card = document.createElement('div');
+        card.className = 'bg-white border border-gray-200 rounded-lg p-4 cursor-move';
+        card.dataset.serverId = server.id;
+        card.dataset.priority = server.priority;
+        
+        const statusColor = server.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600';
+        const statusText = server.enabled ? '启用' : '禁用';
+        
+        card.innerHTML = `
+            <div class="flex items-start justify-between">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center mb-2">
+                        <div class="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                        <h4 class="text-sm font-medium text-gray-900 truncate">${this.escapeHtml(server.name)}</h4>
+                        <div class="ml-2 px-2 py-1 text-xs rounded-full ${statusColor}">
+                            ${statusText}
+                        </div>
+                        <div class="ml-2 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                            #${index + 1}
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-500 mb-1">
+                        <span class="font-mono">${this.escapeHtml(server.url)}</span>
+                    </div>
+                    <div class="text-xs text-gray-400 space-x-4">
+                        <span>超时: ${server.timeout}秒</span>
+                        ${server.api_key ? '<span>🔑 已配置API Key</span>' : '<span>🔓 无API Key</span>'}
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 ml-4">
+                    <button type="button" class="edit-server-btn text-xs text-blue-600 hover:text-blue-800 p-1" 
+                            data-server-id="${server.id}" title="编辑">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                    </button>
+                    <button type="button" class="delete-server-btn text-xs text-red-600 hover:text-red-800 p-1" 
+                            data-server-id="${server.id}" title="删除">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                    <div class="drag-handle cursor-move p-1" title="拖拽排序">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 绑定编辑和删除事件
+        const editBtn = card.querySelector('.edit-server-btn');
+        const deleteBtn = card.querySelector('.delete-server-btn');
+        
+        editBtn.addEventListener('click', () => this.showEditClaudeServerModal(server));
+        deleteBtn.addEventListener('click', () => this.deleteClaudeServer(server.id, server.name));
+        
+        return card;
+    }
+    
+    initServerDragSort() {
+        // 简单的拖拽排序实现
+        let draggedElement = null;
+        
+        const serverCards = this.claudeServersList.querySelectorAll('[data-server-id]');
+        
+        serverCards.forEach(card => {
+            card.draggable = true;
+            
+            card.addEventListener('dragstart', (e) => {
+                draggedElement = card;
+                card.style.opacity = '0.5';
+            });
+            
+            card.addEventListener('dragend', (e) => {
+                card.style.opacity = '';
+                draggedElement = null;
+            });
+            
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault();
+            });
+            
+            card.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (draggedElement && draggedElement !== card) {
+                    const draggedAfter = this.shouldInsertAfter(card, e.clientY);
+                    if (draggedAfter) {
+                        card.parentNode.insertBefore(draggedElement, card.nextSibling);
+                    } else {
+                        card.parentNode.insertBefore(draggedElement, card);
+                    }
+                    
+                    // 更新服务器排序
+                    this.updateServerOrder();
+                }
+            });
+        });
+    }
+    
+    shouldInsertAfter(element, y) {
+        const rect = element.getBoundingClientRect();
+        return y > rect.top + rect.height / 2;
+    }
+    
+    async updateServerOrder() {
+        try {
+            const serverCards = this.claudeServersList.querySelectorAll('[data-server-id]');
+            const serverOrders = Array.from(serverCards).map((card, index) => ({
+                id: parseInt(card.dataset.serverId),
+                priority: index
+            }));
+            
+            const response = await fetch('/_api/claude-code-servers/reorder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ server_orders: serverOrders })
+            });
+            
+            if (response.ok) {
+                console.log('✅ [Frontend] 服务器排序更新成功');
+                // 重新加载列表以更新显示
+                await this.loadClaudeServers();
+            } else {
+                console.error('❌ [Frontend] 服务器排序更新失败');
+            }
+        } catch (error) {
+            console.error('❌ [Frontend] 服务器排序更新出错:', error);
+        }
+    }
+    
+    showAddClaudeServerModal() {
+        this.currentEditingServerId = null;
+        this.claudeServerModalTitle.textContent = '添加服务器';
+        this.resetClaudeServerForm();
+        this.showClaudeServerModal();
+    }
+    
+    showEditClaudeServerModal(server) {
+        this.currentEditingServerId = server.id;
+        this.claudeServerModalTitle.textContent = '编辑服务器';
+        this.fillClaudeServerForm(server);
+        this.showClaudeServerModal();
+    }
+    
+    showClaudeServerModal() {
+        if (this.claudeServerModal) {
+            this.claudeServerModal.classList.remove('hidden');
+            // 聚焦第一个输入框
+            if (this.claudeServerNameInput) {
+                setTimeout(() => this.claudeServerNameInput.focus(), 100);
+            }
+        }
+    }
+    
+    hideClaudeServerModal() {
+        if (this.claudeServerModal) {
+            this.claudeServerModal.classList.add('hidden');
+            this.resetClaudeServerForm();
+            this.currentEditingServerId = null;
+        }
+    }
+    
+    resetClaudeServerForm() {
+        if (this.claudeServerForm) {
+            this.claudeServerForm.reset();
+            this.claudeServerTimeoutInput.value = 600;
+            this.claudeServerEnabledInput.checked = true;
+        }
+    }
+    
+    fillClaudeServerForm(server) {
+        if (this.claudeServerNameInput) this.claudeServerNameInput.value = server.name;
+        if (this.claudeServerUrlInput) this.claudeServerUrlInput.value = server.url;
+        if (this.claudeServerApiKeyInput) this.claudeServerApiKeyInput.value = server.api_key || '';
+        if (this.claudeServerTimeoutInput) this.claudeServerTimeoutInput.value = server.timeout;
+        if (this.claudeServerEnabledInput) this.claudeServerEnabledInput.checked = server.enabled;
+    }
+    
+    async saveClaudeServer(e) {
+        e.preventDefault();
+        
+        const formData = {
+            name: this.claudeServerNameInput.value.trim(),
+            url: this.claudeServerUrlInput.value.trim(),
+            api_key: this.claudeServerApiKeyInput.value.trim(),
+            timeout: parseInt(this.claudeServerTimeoutInput.value),
+            enabled: this.claudeServerEnabledInput.checked
+        };
+        
+        // 基本验证
+        if (!formData.name) {
+            alert('请输入服务器名称');
+            return;
+        }
+        if (!formData.url) {
+            alert('请输入服务器地址');
+            return;
+        }
+        
+        try {
+            let response;
+            if (this.currentEditingServerId) {
+                // 编辑模式
+                response = await fetch(`/_api/claude-code-servers/${this.currentEditingServerId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+            } else {
+                // 添加模式
+                response = await fetch('/_api/claude-code-servers', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+            }
+            
+            if (response.ok) {
+                console.log('✅ [Frontend] 服务器保存成功');
+                this.hideClaudeServerModal();
+                await this.loadClaudeServers();
+            } else {
+                const error = await response.json();
+                alert(`保存失败: ${error.error || response.statusText}`);
+            }
+        } catch (error) {
+            console.error('❌ [Frontend] 服务器保存出错:', error);
+            alert('保存失败，请重试');
+        }
+    }
+    
+    async deleteClaudeServer(serverId, serverName) {
+        if (!confirm(`确定要删除服务器"${serverName}"吗？此操作不可撤销。`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/_api/claude-code-servers/${serverId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                console.log('✅ [Frontend] 服务器删除成功');
+                await this.loadClaudeServers();
+            } else {
+                const error = await response.json();
+                alert(`删除失败: ${error.error || response.statusText}`);
+            }
+        } catch (error) {
+            console.error('❌ [Frontend] 服务器删除出错:', error);
+            alert('删除失败，请重试');
+        }
+    }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }
 
@@ -6269,11 +6643,8 @@ class KeyManager {
     // 获取当前配置
     getCurrentConfig() {
         return {
-            local_path: this.localPathInput?.value || 'api/v1/claude-code',
-            target_url: this.targetUrlInput?.value || ''
+            local_path: window.monitor?.localPathInput?.value || 'api/v1/claude-code',
+            target_url: window.monitor?.targetUrlInput?.value || ''
         };
     }
-
-
 }
-

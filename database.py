@@ -96,6 +96,20 @@ class RoutingScene(Base):
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class ClaudeCodeServer(Base):
+    """Claude Code 服务器配置表"""
+    __tablename__ = "claude_code_servers"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)  # 服务器名称
+    url = Column(String)  # 服务器地址
+    api_key = Column(String)  # API密钥
+    timeout = Column(Integer, default=600)  # 超时时间，默认600秒
+    priority = Column(Integer, default=0)  # 优先级，数字越小优先级越高
+    enabled = Column(Boolean, default=True)  # 是否启用
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 class SystemConfig(Base):
     """系统配置表"""
     __tablename__ = "system_configs"

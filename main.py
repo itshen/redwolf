@@ -30,7 +30,7 @@ def debug_print(*args, **kwargs):
 
 from database import (
     get_db, APIRecord, PlatformConfig, ModelConfig, RoutingConfig, RoutingScene, SystemConfig,
-    UserAuth, LoginSession, hash_password, verify_password, generate_session_token
+    ClaudeCodeServer, UserAuth, LoginSession, hash_password, verify_password, generate_session_token
 )
 from multi_platform_service import multi_platform_service
 
@@ -919,6 +919,177 @@ async def get_record_detail(record_id: int, session: LoginSession = Depends(requ
         "key_info": key_info,
         "token_usage": token_info
     }
+
+# ==================== Claude Code 服务器管理 API ====================
+
+@app.get("/_api/claude-code-servers")
+async def get_claude_code_servers(session: LoginSession = Depends(require_auth), db: Session = Depends(get_db)):
+    """获取所有Claude Code服务器配置"""
+    servers = db.query(ClaudeCodeServer).order_by(ClaudeCodeServer.priority, ClaudeCodeServer.id).all()
+    return [
+        {
+            "id": server.id,
+            "name": server.name,
+            "url": server.url,
+            "api_key": server.api_key,
+            "timeout": server.timeout,
+            "priority": server.priority,
+            "enabled": server.enabled,
+            "created_at": server.created_at.isoformat(),
+            "updated_at": server.updated_at.isoformat()
+        }
+        for server in servers
+    ]
+
+@app.post("/_api/claude-code-servers")
+async def create_claude_code_server(request: Request, session: LoginSession = Depends(require_auth), db: Session = Depends(get_db)):
+    """创建新的Claude Code服务器配置"""
+    try:
+        data = await request.json()
+        name = data.get("name", "").strip()
+        url = data.get("url", "").strip()
+        api_key = data.get("api_key", "").strip()
+        timeout = data.get("timeout", 600)
+        priority = data.get("priority", 0)
+        enabled = data.get("enabled", True)
+        
+        if not name:
+            return JSONResponse(status_code=400, content={"error": "服务器名称不能为空"})
+        if not url:
+            return JSONResponse(status_code=400, content={"error": "服务器地址不能为空"})
+        
+        # 检查名称是否重复
+        existing_server = db.query(ClaudeCodeServer).filter(ClaudeCodeServer.name == name).first()
+        if existing_server:
+            return JSONResponse(status_code=400, content={"error": "服务器名称已存在"})
+        
+        # 创建新服务器配置
+        new_server = ClaudeCodeServer(
+            name=name,
+            url=url,
+            api_key=api_key,
+            timeout=timeout,
+            priority=priority,
+            enabled=enabled
+        )
+        
+        db.add(new_server)
+        db.commit()
+        db.refresh(new_server)
+        
+        return {
+            "id": new_server.id,
+            "name": new_server.name,
+            "url": new_server.url,
+            "api_key": new_server.api_key,
+            "timeout": new_server.timeout,
+            "priority": new_server.priority,
+            "enabled": new_server.enabled,
+            "created_at": new_server.created_at.isoformat(),
+            "updated_at": new_server.updated_at.isoformat()
+        }
+        
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"创建服务器配置失败: {str(e)}"})
+
+@app.put("/_api/claude-code-servers/{server_id}")
+async def update_claude_code_server(server_id: int, request: Request, session: LoginSession = Depends(require_auth), db: Session = Depends(get_db)):
+    """更新Claude Code服务器配置"""
+    try:
+        server = db.query(ClaudeCodeServer).filter(ClaudeCodeServer.id == server_id).first()
+        if not server:
+            return JSONResponse(status_code=404, content={"error": "服务器配置不存在"})
+        
+        data = await request.json()
+        
+        # 更新字段
+        if "name" in data:
+            name = data["name"].strip()
+            if not name:
+                return JSONResponse(status_code=400, content={"error": "服务器名称不能为空"})
+            # 检查名称是否重复（排除自己）
+            existing_server = db.query(ClaudeCodeServer).filter(
+                ClaudeCodeServer.name == name, 
+                ClaudeCodeServer.id != server_id
+            ).first()
+            if existing_server:
+                return JSONResponse(status_code=400, content={"error": "服务器名称已存在"})
+            server.name = name
+        
+        if "url" in data:
+            url = data["url"].strip()
+            if not url:
+                return JSONResponse(status_code=400, content={"error": "服务器地址不能为空"})
+            server.url = url
+        
+        if "api_key" in data:
+            server.api_key = data["api_key"].strip()
+        
+        if "timeout" in data:
+            server.timeout = data["timeout"]
+        
+        if "priority" in data:
+            server.priority = data["priority"]
+        
+        if "enabled" in data:
+            server.enabled = data["enabled"]
+        
+        server.updated_at = datetime.utcnow()
+        db.commit()
+        
+        return {
+            "id": server.id,
+            "name": server.name,
+            "url": server.url,
+            "api_key": server.api_key,
+            "timeout": server.timeout,
+            "priority": server.priority,
+            "enabled": server.enabled,
+            "created_at": server.created_at.isoformat(),
+            "updated_at": server.updated_at.isoformat()
+        }
+        
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"更新服务器配置失败: {str(e)}"})
+
+@app.delete("/_api/claude-code-servers/{server_id}")
+async def delete_claude_code_server(server_id: int, session: LoginSession = Depends(require_auth), db: Session = Depends(get_db)):
+    """删除Claude Code服务器配置"""
+    try:
+        server = db.query(ClaudeCodeServer).filter(ClaudeCodeServer.id == server_id).first()
+        if not server:
+            return JSONResponse(status_code=404, content={"error": "服务器配置不存在"})
+        
+        # 删除服务器配置
+        db.delete(server)
+        db.commit()
+        
+        return {"message": "服务器配置删除成功"}
+        
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"删除服务器配置失败: {str(e)}"})
+
+@app.post("/_api/claude-code-servers/reorder")
+async def reorder_claude_code_servers(request: Request, session: LoginSession = Depends(require_auth), db: Session = Depends(get_db)):
+    """重新排序Claude Code服务器"""
+    try:
+        data = await request.json()
+        server_orders = data.get("server_orders", [])  # [{"id": 1, "priority": 0}, {"id": 2, "priority": 1}, ...]
+        
+        for order_info in server_orders:
+            server_id = order_info.get("id")
+            priority = order_info.get("priority")
+            
+            server = db.query(ClaudeCodeServer).filter(ClaudeCodeServer.id == server_id).first()
+            if server:
+                server.priority = priority
+                server.updated_at = datetime.utcnow()
+        
+        db.commit()
+        return {"message": "服务器排序更新成功"}
+        
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"更新服务器排序失败: {str(e)}"})
 
 # ==================== KEY 管理 API ====================
 
@@ -2164,8 +2335,244 @@ async def handle_multi_platform_request(request: Request, path: str, db: Session
         )
 
 async def handle_original_proxy_request(request: Request, path: str, db: Session, start_time: float, body_str: str = ""):
-    """处理原有的代理请求逻辑"""
-    logger.info("🎯 [夺舍] 开始原始代理转发处理...")
+    """处理原有的代理请求逻辑 - 支持多服务器轮询"""
+    logger.info("🎯 [夺舍] 开始Claude Code多服务器代理转发处理...")
+    
+    # 获取当前工作模式
+    current_mode = config_data.get("current_work_mode", "claude_code")
+    
+    if current_mode == "claude_code":
+        # Claude Code模式：使用多服务器配置，需要KEY验证
+        logger.info("🔑 [夺舍] Claude Code模式开始KEY验证...")
+        
+        # 从Authorization头或api-key头中获取KEY
+        auth_header = request.headers.get("authorization", "")
+        api_key_header = request.headers.get("api-key", "")
+        
+        api_key = ""
+        if auth_header.startswith("Bearer "):
+            api_key = auth_header[7:]  # 移除 "Bearer " 前缀
+        elif api_key_header:
+            api_key = api_key_header
+        
+        user_key_id = None
+        if api_key:
+            logger.info(f"🔑 [夺舍] Claude Code模式检测到用户KEY: {api_key[:8]}****")
+            user_key_id = await validate_user_key(api_key, db)
+            
+            if user_key_id is None:
+                logger.warning(f"❌ [夺舍] Claude Code模式KEY验证失败: {api_key[:8]}****")
+                # 返回401错误
+                error_response = {
+                    "error": {
+                        "type": "authentication_error",
+                        "message": "Invalid API key or key has expired/exceeded limits"
+                    }
+                }
+                return JSONResponse(status_code=401, content=error_response)
+            else:
+                logger.info(f"✅ [夺舍] Claude Code模式KEY验证成功，KEY ID: {user_key_id}")
+        else:
+            logger.warning("🔑 [夺舍] Claude Code模式未提供KEY，将拒绝请求")
+            error_response = {
+                "error": {
+                    "type": "authentication_error", 
+                    "message": "API key required for Claude Code mode"
+                }
+            }
+            return JSONResponse(status_code=401, content=error_response)
+        
+        return await handle_claude_code_multi_server_request(request, path, db, start_time, body_str, user_key_id)
+    else:
+        # 其他模式：使用原有的单服务器逻辑（兼容性）
+        return await handle_legacy_single_server_request(request, path, db, start_time, body_str)
+
+async def handle_claude_code_multi_server_request(request: Request, path: str, db: Session, start_time: float, body_str: str = "", user_key_id: Optional[int] = None):
+    """处理Claude Code多服务器请求"""
+    logger.info("🔄 [夺舍] Claude Code多服务器模式")
+    
+    if user_key_id:
+        logger.info(f"🔑 [夺舍] 使用用户KEY ID: {user_key_id}")
+    
+    # 获取所有启用的服务器，按优先级排序
+    servers = db.query(ClaudeCodeServer).filter(
+        ClaudeCodeServer.enabled == True
+    ).order_by(ClaudeCodeServer.priority, ClaudeCodeServer.id).all()
+    
+    if not servers:
+        logger.warning("⚠️ [夺舍] 没有可用的Claude Code服务器配置")
+        # 回退到原有配置
+        return await handle_legacy_single_server_request(request, path, db, start_time, body_str)
+    
+    logger.info(f"📋 [夺舍] 找到 {len(servers)} 个可用服务器")
+    
+    # 构建剩余路径
+    local_path = config_data.get("local_path", "api/v1/claude-code")
+    if path.startswith(local_path):
+        remaining_path = path[len(local_path):]
+    else:
+        remaining_path = f"/{path}"
+    
+    # 获取请求数据
+    headers = dict(request.headers)
+    # 只移除真正的hop-by-hop headers，保留所有认证和业务相关headers
+    hop_by_hop_headers = ['connection', 'keep-alive', 'te', 'trailers', 'transfer-encoding', 'upgrade']
+    headers = {k: v for k, v in headers.items() if k.lower() not in hop_by_hop_headers}
+    headers.pop('host', None)  # 移除host header
+    
+    # 🔑 [修复] 移除用户的认证头，防止传递lxs_开头的KEY给Claude Code服务器
+    headers.pop('authorization', None)  # 移除用户的authorization头
+    headers.pop('api-key', None)  # 移除用户的api-key头
+    logger.info("🔑 [夺舍] 已移除用户认证头，将使用服务器配置的API Key")
+    
+    body = body_str.encode('utf-8') if body_str else b""
+    
+    # 逐个尝试服务器
+    for i, server in enumerate(servers):
+        server_name = server.name
+        target_url = f"{server.url.rstrip('/')}{remaining_path}"
+        timeout = server.timeout
+        
+        logger.info(f"🎯 [夺舍] 尝试服务器 {i+1}/{len(servers)}: {server_name}")
+        logger.info(f"📡 [夺舍] 目标URL: {target_url}")
+        logger.info(f"⏱️ [夺舍] 超时设置: {timeout}秒")
+        
+        # 准备请求头，添加服务器的API Key（如果有）
+        request_headers = headers.copy()
+        if server.api_key:
+            # 使用服务器配置的API Key，覆盖任何现有的认证头
+            request_headers["authorization"] = f"Bearer {server.api_key}"
+            logger.info(f"🔑 [夺舍] 使用服务器API Key: {server.api_key[:8]}****")
+        else:
+            logger.warning(f"⚠️ [夺舍] 服务器 {server_name} 未配置API Key")
+        
+        try:
+            # 发送请求到当前服务器
+            async with httpx.AsyncClient(timeout=timeout, verify=True) as client:
+                response = await client.request(
+                    method=request.method,
+                    url=target_url,
+                    headers=request_headers,
+                    content=body,
+                    params=request.query_params,
+                    follow_redirects=True
+                )
+            
+            # 检查响应状态
+            response_text = response.text
+            logger.info(f"📊 [夺舍] 服务器响应: {response.status_code}")
+            
+            # 判断是否需要切换到下一个服务器
+            should_fallback = False
+            fallback_reason = ""
+            
+            if response.status_code != 200:
+                should_fallback = True
+                fallback_reason = f"HTTP错误码: {response.status_code}"
+            else:
+                # 检查响应内容中的错误关键词
+                error_keywords = [
+                    "unauthorized", "authentication", "permission", "access denied",
+                    "quota", "limit", "exceeded", "insufficient", "balance",
+                    "api key", "invalid key", "expired", "blocked"
+                ]
+                
+                response_lower = response_text.lower()
+                for keyword in error_keywords:
+                    if keyword in response_lower:
+                        should_fallback = True
+                        fallback_reason = f"响应包含错误关键词: {keyword}"
+                        break
+            
+            if should_fallback and i < len(servers) - 1:
+                # 还有其他服务器可以尝试
+                logger.warning(f"⚠️ [夺舍] 服务器 {server_name} 失败: {fallback_reason}")
+                logger.info(f"🔄 [夺舍] 切换到下一个服务器...")
+                continue
+            
+            # 记录成功或最后一次尝试的结果
+            end_time = time.time()
+            duration_ms = int((end_time - start_time) * 1000)
+            
+            if should_fallback:
+                logger.error(f"❌ [夺舍] 所有服务器都失败了，最后尝试: {server_name}")
+                logger.error(f"❌ [夺舍] 最终错误: {fallback_reason}")
+                routing_info = f"❌ 多服务器失败 ({len(servers)}个)"
+            else:
+                logger.info(f"✅ [夺舍] 转发成功! 服务器: {server_name}, 状态码: {response.status_code}, 耗时: {duration_ms}ms")
+                logger.info(f"📤 [夺舍] 响应大小: {len(response_text)} 字符")
+                routing_info = f"❇️ Claude Code ({server_name})"
+            
+            # 保存记录
+            await save_api_record(
+                method=request.method,
+                path=f"/{path}",
+                headers=headers,
+                body=body_str,
+                response_status=response.status_code,
+                response_headers=dict(response.headers),
+                response_body=response_text,
+                duration_ms=duration_ms,
+                db=db,
+                target_platform="Claude Code",
+                target_model=server_name,
+                routing_info=routing_info,
+                platform_base_url=server.url,
+                user_key_id=user_key_id
+            )
+            
+            # 返回响应
+            response_headers = dict(response.headers)
+            response_headers_to_remove = ['connection', 'transfer-encoding']
+            response_headers = {k: v for k, v in response_headers.items() if k.lower() not in response_headers_to_remove}
+            
+            logger.info("🎯 [夺舍] ============ Claude Code多服务器夺舍完成 ============")
+            
+            return Response(
+                content=response.content,
+                status_code=response.status_code,
+                headers=response_headers
+            )
+            
+        except Exception as e:
+            if i < len(servers) - 1:
+                # 还有其他服务器可以尝试
+                logger.warning(f"⚠️ [夺舍] 服务器 {server_name} 连接失败: {str(e)}")
+                logger.info(f"🔄 [夺舍] 切换到下一个服务器...")
+                continue
+            else:
+                # 这是最后一个服务器，记录错误
+                logger.error(f"❌ [夺舍] 所有服务器都无法连接，最后尝试: {server_name}")
+                logger.error(f"❌ [夺舍] 最终错误: {str(e)}")
+                
+                end_time = time.time()
+                duration_ms = int((end_time - start_time) * 1000)
+                
+                await save_api_record(
+                    method=request.method,
+                    path=f"/{path}",
+                    headers=headers,
+                    body=body_str,
+                    response_status=500,
+                    response_headers={},
+                    response_body=f"所有Claude Code服务器都失败: {str(e)}",
+                    duration_ms=duration_ms,
+                    db=db,
+                    routing_info=f"❌ 多服务器全部失败 ({len(servers)}个)",
+                    user_key_id=user_key_id
+                )
+                
+                logger.error("🎯 [夺舍] ============ Claude Code多服务器夺舍失败 ============")
+                
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": f"所有Claude Code服务器都无法访问: {str(e)}"}
+                )
+
+async def handle_legacy_single_server_request(request: Request, path: str, db: Session, start_time: float, body_str: str = ""):
+    """处理传统单服务器请求（兼容性）"""
+    logger.info("🎯 [夺舍] 传统单服务器模式")
+    
     # 构建目标URL - 使用配置中的映射
     local_path = config_data["local_path"]
     target_base = config_data["target_url"]
@@ -2226,7 +2633,7 @@ async def handle_original_proxy_request(request: Request, path: str, db: Session
             db=db,
             target_platform="DashScope",
             target_model="claude-code-proxy",
-            routing_info="❇️ Claude Code",
+            routing_info="❇️ Claude Code (传统)",
             platform_base_url="https://dashscope.aliyuncs.com"
         )
         
@@ -2261,7 +2668,7 @@ async def handle_original_proxy_request(request: Request, path: str, db: Session
             response_body=f"Error: {str(e)}",
             duration_ms=duration_ms,
             db=db,
-            routing_info="❌ 原始代理模式失败"
+            routing_info="❌ 传统代理模式失败"
         )
         
         return JSONResponse(
