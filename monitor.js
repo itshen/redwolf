@@ -34,6 +34,15 @@ class APIHookMonitor {
         this.isRestoringSSE = false; // 标记是否正在恢复SSE视图
         this.restoringViewCount = 0; // 恢复视图计数器
         
+        // 懒加载配置
+        this.lazyLoading = {
+            pageSize: 50,           // 每页显示的记录数
+            currentPage: 0,         // 当前页数
+            isLoading: false,       // 是否正在加载
+            hasMore: true,          // 是否还有更多数据
+            loadThreshold: 200      // 距离底部多少像素时触发加载
+        };
+        
         this.initializeElements();
         this.bindEvents();
         this.initializeResizer();
@@ -276,6 +285,11 @@ class APIHookMonitor {
                 this.togglePerformanceMonitor(e.target.checked);
             }
         });
+
+        // 添加记录列表滚动监听，实现懒加载
+        if (this.recordsList) {
+            this.recordsList.addEventListener('scroll', () => this.handleRecordsScroll());
+        }
     }
 
     initializeResizer() {
@@ -3109,7 +3123,87 @@ class APIHookMonitor {
 
     addNewRecord(record) {
         this.records.unshift(record);
-        this.renderRecordsList();
+        
+        // 优化性能：只有当新记录符合当前筛选条件时才更新显示
+        if (this.currentFilter === 'all' || record.method === this.currentFilter) {
+            // 检查是否应该直接添加到列表顶部而不是重新渲染
+            if (this.lazyLoading.currentPage > 0) {
+                // 已经显示了多页，直接在顶部插入新记录
+                this.insertNewRecordToTop(record);
+            } else {
+                // 还在第一页，重新渲染以确保正确的显示顺序
+                this.renderRecordsList(true);
+            }
+        }
+        
+        // 更新记录计数显示
+        this.updateRecordCount();
+    }
+
+    // 在列表顶部插入新记录（性能优化）
+    insertNewRecordToTop(record) {
+        const timestamp = new Date(record.timestamp).toLocaleString('zh-CN', {
+            timeZone: 'Asia/Shanghai',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        const statusColor = record.response_status >= 400 ? 'text-red-600' : 
+                          record.response_status >= 300 ? 'text-yellow-600' : 'text-green-600';
+        
+        const recordHtml = `
+            <div class="record-item p-4 border-b cursor-pointer" 
+                 data-id="${record.id}" onclick="monitor.selectRecord(${record.id})">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-2 mb-1">
+                            <span class="text-xs font-medium px-2 py-1 rounded bg-blue-100 text-blue-800">
+                                ${record.method}
+                            </span>
+                            <span class="text-sm font-medium text-gray-900 truncate">
+                                ${this.getDisplayPath(record.path)}
+                            </span>
+                        </div>
+                        <div class="text-xs text-gray-500">${timestamp}</div>
+                    </div>
+                    <div class="text-right ml-4">
+                        <div class="text-sm font-medium ${statusColor}">
+                            ${record.response_status}
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            ${record.duration_ms}ms
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 在列表开头插入新记录
+        this.recordsList.insertAdjacentHTML('afterbegin', recordHtml);
+        
+        // 添加高亮动画效果
+        const newElement = this.recordsList.firstElementChild;
+        if (newElement) {
+            newElement.style.backgroundColor = '#dbeafe';
+            setTimeout(() => {
+                newElement.style.transition = 'background-color 1s ease';
+                newElement.style.backgroundColor = '';
+            }, 100);
+        }
+    }
+
+    // 更新记录计数显示
+    updateRecordCount() {
+        this.applyFilter(); // 重新计算筛选结果
+        
+        if (this.currentFilter === 'all') {
+            this.totalCount.textContent = this.records.length;
+        } else {
+            this.totalCount.textContent = `${this.filteredRecords.length} / ${this.records.length}`;
+        }
     }
 
     async clearRecords() {
@@ -3142,7 +3236,7 @@ class APIHookMonitor {
         }
     }
 
-    renderRecordsList() {
+    renderRecordsList(reset = true) {
         // 应用筛选
         this.applyFilter();
         
@@ -3158,12 +3252,25 @@ class APIHookMonitor {
             this.noRecords.textContent = this.records.length === 0 ? '暂无API调用记录' : '没有符合筛选条件的记录';
             // 清空记录列表显示
             this.recordsList.innerHTML = '';
+            this.resetLazyLoading();
             return;
         } else {
             this.noRecords.style.display = 'none';
         }
 
-        const recordsHtml = this.filteredRecords.map(record => {
+        // 如果是重置操作，清空现有内容并重置懒加载状态
+        if (reset) {
+            this.resetLazyLoading();
+            this.recordsList.innerHTML = '';
+        }
+
+        // 计算要渲染的记录范围
+        const startIndex = this.lazyLoading.currentPage * this.lazyLoading.pageSize;
+        const endIndex = Math.min(startIndex + this.lazyLoading.pageSize, this.filteredRecords.length);
+        const recordsToRender = this.filteredRecords.slice(startIndex, endIndex);
+
+        // 生成HTML
+        const recordsHtml = recordsToRender.map(record => {
             const timestamp = new Date(record.timestamp).toLocaleString('zh-CN', {
                 timeZone: 'Asia/Shanghai',
                 year: 'numeric',
@@ -3204,7 +3311,97 @@ class APIHookMonitor {
             `;
         }).join('');
 
-        this.recordsList.innerHTML = recordsHtml;
+        // 追加HTML到列表
+        if (reset) {
+            this.recordsList.innerHTML = recordsHtml;
+        } else {
+            this.recordsList.insertAdjacentHTML('beforeend', recordsHtml);
+        }
+
+        // 更新懒加载状态
+        this.lazyLoading.currentPage++;
+        this.lazyLoading.hasMore = endIndex < this.filteredRecords.length;
+        
+        // 添加加载更多指示器
+        this.updateLoadMoreIndicator();
+    }
+
+    // 重置懒加载状态
+    resetLazyLoading() {
+        this.lazyLoading.currentPage = 0;
+        this.lazyLoading.isLoading = false;
+        this.lazyLoading.hasMore = true;
+    }
+
+    // 加载更多记录
+    loadMoreRecords() {
+        if (!this.lazyLoading.hasMore || this.lazyLoading.isLoading) {
+            return;
+        }
+
+        this.lazyLoading.isLoading = true;
+        this.updateLoadMoreIndicator();
+
+        // 使用 setTimeout 来避免阻塞 UI
+        setTimeout(() => {
+            this.renderRecordsList(false);
+            this.lazyLoading.isLoading = false;
+            this.updateLoadMoreIndicator();
+        }, 100);
+    }
+
+    // 更新"加载更多"指示器
+    updateLoadMoreIndicator() {
+        let indicator = document.getElementById('load-more-indicator');
+        
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'load-more-indicator';
+            indicator.className = 'p-4 text-center text-sm text-gray-500 border-t';
+        }
+
+        if (this.lazyLoading.isLoading) {
+            indicator.innerHTML = `
+                <div class="flex items-center justify-center space-x-2">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                    <span>加载中...</span>
+                </div>
+            `;
+            if (!indicator.parentNode) {
+                this.recordsList.appendChild(indicator);
+            }
+        } else if (this.lazyLoading.hasMore) {
+            indicator.innerHTML = `
+                <button onclick="monitor.loadMoreRecords()" class="text-blue-500 hover:text-blue-600 font-medium">
+                    点击加载更多记录
+                </button>
+            `;
+            if (!indicator.parentNode) {
+                this.recordsList.appendChild(indicator);
+            }
+        } else {
+            // 移除指示器
+            if (indicator.parentNode) {
+                indicator.parentNode.removeChild(indicator);
+            }
+        }
+    }
+
+    // 处理记录列表滚动事件
+    handleRecordsScroll() {
+        if (!this.recordsList || !this.lazyLoading.hasMore || this.lazyLoading.isLoading) {
+            return;
+        }
+
+        const scrollTop = this.recordsList.scrollTop;
+        const scrollHeight = this.recordsList.scrollHeight;
+        const clientHeight = this.recordsList.clientHeight;
+
+        // 当滚动到距离底部指定阈值内时，触发加载更多
+        if (scrollTop + clientHeight >= scrollHeight - this.lazyLoading.loadThreshold) {
+            console.log('🔄 [懒加载] 触发自动加载更多记录');
+            this.loadMoreRecords();
+        }
     }
 
     async selectRecord(recordId) {
@@ -6045,7 +6242,9 @@ class APIHookMonitor {
     // 更新最后刷新时间
     updateLastRefreshTime() {
         const now = new Date();
-        const timeString = now.toLocaleString('zh-CN');
+        const timeString = now.toLocaleString('zh-CN', {
+            timeZone: 'Asia/Shanghai'
+        });
         this.updateElementText('status-last-update', timeString);
     }
     
