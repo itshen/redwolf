@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  redwolf:
+    build: .
+    container_name: redwolf-app
+    ports:
+      - "8000:8000"
+    volumes:
+      - redwolf_data:/app
+    environment:
+      - DEBUG_MODE=false
+    command: python start.py --skip-install
+
+volumes:
+  redwolf_data:
