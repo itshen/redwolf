@@ -5,10 +5,16 @@ from datetime import datetime
 import json
 import hashlib
 import secrets
+import os
 
+# 确保数据库文件路径在Docker容器中可写
 DATABASE_URL = "sqlite:///./api_records.db"
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# 添加连接参数以适应Docker环境
+engine = create_engine(DATABASE_URL, connect_args={
+    "check_same_thread": False,
+    "timeout": 30
+})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
