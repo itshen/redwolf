@@ -73,6 +73,8 @@ python3.11 start.py --debug
 |------|----------|------|
 | 🌟 **阿里云百炼** | API Key | 支持通义千问系列 |
 | 🌐 **OpenRouter** | API Key | 访问多种商业模型 |
+| 🔥 **硅基流动** | API Key | 高性价比开源模型聚合 |
+| ⚙️ **OpenAI兼容** | API Key + Base URL | 任何兼容OpenAI API的服务 |
 | 🐋 **Ollama** | 本地服务 | 需启动 `ollama serve` |
 | 🖥️ **LMStudio** | 本地服务 | 需启动本地服务器 |
 
@@ -147,6 +149,8 @@ ollama serve
 ### 🔌 多平台支持
 - **阿里云百炼 (DashScope)** - 通义千问系列模型
 - **OpenRouter** - 访问多种开源和商业模型
+- **硅基流动 (SiliconFlow)** - 高性价比开源模型聚合服务
+- **OpenAI兼容** - 任何兼容OpenAI API格式的第三方服务
 - **Ollama** - 本地部署的开源模型
 - **LMStudio** - 本地GPU加速的模型服务
 
@@ -234,6 +238,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/claude-code/messages \
 |------|----------|
 | 阿里云百炼 | `qwen-plus`, `qwen-max`, `qwen-coder` |
 | OpenRouter | `claude-3-opus`, `gpt-4o`, `llama-3.1-405b` |
+| 硅基流动 | `Qwen/QwQ-32B`, `Qwen/Qwen2.5-72B-Instruct`, `deepseek-ai/DeepSeek-V2.5` |
+| OpenAI兼容 | 根据具体服务提供的模型 |
 | Ollama | 本地下载的所有模型 |
 | LMStudio | 已加载的模型 |
 
@@ -244,11 +250,11 @@ curl -X POST http://127.0.0.1:8000/api/v1/claude-code/messages \
 ### 🔧 平台配置
 所有配置都通过Web界面完成，支持实时保存和验证：
 
-| 配置项 | 阿里云百炼 | OpenRouter | Ollama | LMStudio |
-|--------|------------|------------|--------|----------|
-| **API Key** | ✅ 必需 | ✅ 必需 | ❌ 不需要 | ❌ 不需要 |
-| **服务地址** | 默认 | 默认 | localhost:11434 | localhost:1234 |
-| **超时设置** | 30秒 | 30秒 | 30秒 | 30秒 |
+| 配置项 | 阿里云百炼 | OpenRouter | 硅基流动 | OpenAI兼容 | Ollama | LMStudio |
+|--------|------------|------------|----------|------------|--------|----------|
+| **API Key** | ✅ 必需 | ✅ 必需 | ✅ 必需 | ✅ 必需 | ❌ 不需要 | ❌ 不需要 |
+| **服务地址** | 默认 | 默认 | 默认 | ✅ 必需配置 | localhost:11434 | localhost:1234 |
+| **超时设置** | 30秒 | 30秒 | 30秒 | 30秒 | 30秒 | 30秒 |
 
 ### 🎯 路由模式配置
 
