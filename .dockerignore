@@ -1,0 +1,87 @@
+# Git 相关
+.git
+.gitignore
+.gitattributes
+
+# Python 相关
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv/
+
+# IDE 和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# 临时文件
+*.tmp
+*.temp
+
+# 日志文件
+*.log
+logs/
+
+# 数据库文件（根据实际情况调整）
+*.db
+*.sqlite
+*.sqlite3
+
+# 配置文件（可能包含敏感信息）
+.env
+.env.local
+.env.production
+.env.staging
+
+# 文档
+README.md
+docs/
+*.md
+
+# Docker 相关
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# 测试文件
+test/
+tests/
+*_test.py
+test_*.py

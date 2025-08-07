@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  redwolf:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: redwolf-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG_MODE=false
+    volumes:
+      # 挂载数据目录（如果需要持久化数据）
+      - ./data:/app/data
+      # 挂载配置文件（如果有的话）
+      - ./config:/app/config
+    restart: unless-stopped
+    networks:
+      - redwolf-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 如果需要数据库，可以添加数据库服务
+  # database:
+  #   image: postgres:15-alpine
+  #   container_name: redwolf-db
+  #   environment:
+  #     POSTGRES_DB: redwolf
+  #     POSTGRES_USER: redwolf
+  #     POSTGRES_PASSWORD: your_password_here
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - redwolf-network
+  #   restart: unless-stopped
+
+networks:
+  redwolf-network:
+    driver: bridge
+
+# volumes:
+#   postgres_data:
