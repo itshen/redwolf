@@ -260,6 +260,10 @@ class MultiPlatformService:
                                         converter_type = "ollama"
                                     elif platform_type_str == "lmstudio":
                                         converter_type = "lmstudio"
+                                    elif platform_type_str == "siliconflow":
+                                        converter_type = "openai"  # 硅基流动使用OpenAI格式
+                                    elif platform_type_str == "openai_compatible":
+                                        converter_type = "openai"  # OpenAI兼容使用OpenAI格式
                                     else:
                                         converter_type = "openai"
                                     
@@ -474,7 +478,15 @@ class MultiPlatformService:
                 "anthropic-version", "anthropic-beta", "anthropic-dangerous-direct-browser-access"
             ],
             "ollama": ["tools", "tool_choice", "metadata", "anthropic-version", "anthropic-beta"],
-            "lmstudio": ["tools", "tool_choice", "metadata", "anthropic-version", "anthropic-beta"]
+            "lmstudio": ["tools", "tool_choice", "metadata", "anthropic-version", "anthropic-beta"],
+            "siliconflow": [
+                # 硅基流动支持OpenAI格式，只过滤Anthropic特有的参数
+                "anthropic-version", "anthropic-beta", "anthropic-dangerous-direct-browser-access"
+            ],
+            "openai_compatible": [
+                # OpenAI兼容API，只过滤Anthropic特有的参数
+                "anthropic-version", "anthropic-beta", "anthropic-dangerous-direct-browser-access"
+            ]
         }
         
         platform_name = platform_type.value
@@ -539,6 +551,14 @@ class MultiPlatformService:
         elif platform_name == "lmstudio":
             base_url = getattr(client, 'base_url', 'http://localhost:1234')
             return f"{base_url}/v1/chat/completions"
+        elif platform_name == "siliconflow":
+            return "https://api.siliconflow.cn/v1/chat/completions"
+        elif platform_name == "openai_compatible":
+            base_url = getattr(client, 'base_url', '')
+            if not base_url:
+                raise ValueError("OpenAI Compatible platform requires base_url configuration")
+            base_url = base_url.rstrip('/')
+            return f"{base_url}/chat/completions"
         else:
             raise ValueError(f"Unsupported platform: {platform_name}")
     
@@ -557,6 +577,10 @@ class MultiPlatformService:
         elif platform_name == "lmstudio":
             # LMStudio通常不需要认证
             pass
+        elif platform_name == "siliconflow":
+            headers["Authorization"] = f"Bearer {client.config.api_key}"
+        elif platform_name == "openai_compatible":
+            headers["Authorization"] = f"Bearer {client.config.api_key}"
         
         return headers
     

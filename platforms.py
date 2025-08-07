@@ -29,6 +29,8 @@ class PlatformType(Enum):
     OPENROUTER = "openrouter"
     OLLAMA = "ollama"
     LMSTUDIO = "lmstudio"
+    SILICONFLOW = "siliconflow"  # 硅基流动
+    OPENAI_COMPATIBLE = "openai_compatible"  # OpenAI兼容
 
 @dataclass
 class PlatformConfig:
@@ -455,6 +457,288 @@ class OllamaClient(PlatformClient):
             }]
         }
 
+class SiliconFlowClient(PlatformClient):
+    """硅基流动客户端"""
+    
+    def __init__(self, config: PlatformConfig):
+        super().__init__(config)
+        self.base_url = "https://api.siliconflow.cn"
+    
+    async def get_models(self) -> List[ModelInfo]:
+        """获取硅基流动模型列表"""
+        logger.info("🔍 [SiliconFlow] 开始获取模型列表...")
+        
+        if not self.config.api_key:
+            logger.warning("⚠️ [SiliconFlow] API Key未配置，跳过获取模型")
+            return []
+        
+        try:
+            logger.info(f"🌐 [SiliconFlow] 请求URL: {self.base_url}/v1/models")
+            async with httpx.AsyncClient(timeout=self.config.timeout) as client:
+                response = await client.get(
+                    f"{self.base_url}/v1/models",
+                    headers={
+                        "Authorization": f"Bearer {self.config.api_key}",
+                        "Content-Type": "application/json"
+                    }
+                )
+                
+                logger.info(f"📡 [SiliconFlow] API响应状态: {response.status_code}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    models = []
+                    
+                    logger.info(f"📋 [SiliconFlow] 响应数据: {json.dumps(data, indent=2, ensure_ascii=False)}")
+                    
+                    # 解析模型列表
+                    if "data" in data:
+                        for model in data["data"]:
+                            model_id = model.get("id", "")
+                            model_name = model.get("name", model_id)
+                            
+                            model_info = ModelInfo(
+                                id=model_id,
+                                name=model_name,
+                                platform=PlatformType.SILICONFLOW,
+                                description=model.get("description", f"硅基流动模型: {model_id}")
+                            )
+                            models.append(model_info)
+                    else:
+                        # 如果API返回格式不匹配，添加一些默认的硅基流动模型
+                        logger.info("⚠️ [SiliconFlow] API响应格式不匹配，使用默认模型列表")
+                        default_models = [
+                            {"id": "Qwen/QwQ-32B", "name": "QwQ-32B", "description": "千问推理模型32B版本"},
+                            {"id": "Qwen/Qwen2.5-72B-Instruct", "name": "Qwen2.5-72B-Instruct", "description": "千问2.5 72B指令版"},
+                            {"id": "Qwen/Qwen2.5-32B-Instruct", "name": "Qwen2.5-32B-Instruct", "description": "千问2.5 32B指令版"},
+                            {"id": "Qwen/Qwen2.5-14B-Instruct", "name": "Qwen2.5-14B-Instruct", "description": "千问2.5 14B指令版"},
+                            {"id": "Qwen/Qwen2.5-7B-Instruct", "name": "Qwen2.5-7B-Instruct", "description": "千问2.5 7B指令版"},
+                            {"id": "meta-llama/Llama-3.1-70B-Instruct", "name": "Llama-3.1-70B-Instruct", "description": "Llama 3.1 70B指令版"},
+                            {"id": "meta-llama/Llama-3.1-8B-Instruct", "name": "Llama-3.1-8B-Instruct", "description": "Llama 3.1 8B指令版"},
+                            {"id": "deepseek-ai/DeepSeek-V2.5", "name": "DeepSeek-V2.5", "description": "深度求索V2.5模型"},
+                        ]
+                        
+                        for model in default_models:
+                            model_info = ModelInfo(
+                                id=model["id"],
+                                name=model["name"],
+                                platform=PlatformType.SILICONFLOW,
+                                description=model["description"]
+                            )
+                            models.append(model_info)
+                    
+                    logger.info(f"✅ [SiliconFlow] 成功获取 {len(models)} 个模型")
+                    return models
+                else:
+                    logger.error(f"❌ [SiliconFlow] API错误: {response.status_code} - {response.text}")
+                    return []
+                    
+        except Exception as e:
+            logger.error(f"❌ [SiliconFlow] 获取模型失败: {e}")
+            return []
+    
+    async def chat_completion(
+        self, 
+        model: str, 
+        messages: List[Dict[str, Any]], 
+        stream: bool = False,
+        **kwargs
+    ) -> AsyncGenerator[str, None]:
+        """硅基流动聊天补全"""
+        if not self.config.api_key:
+            yield json.dumps({"error": "API key not configured"})
+            return
+        
+        url = f"{self.base_url}/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.config.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": stream,
+            **kwargs
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=self.config.timeout) as client:
+                if stream:
+                    async with client.stream(
+                        "POST", url, headers=headers, json=payload
+                    ) as response:
+                        if response.status_code == 200:
+                            async for line in response.aiter_lines():
+                                if line.strip():
+                                    if line.startswith("data: "):
+                                        data = line[6:]
+                                        if data.strip() == "[DONE]":
+                                            break
+                                        yield data
+                                    else:
+                                        yield line
+                        else:
+                            error_msg = await response.aread()
+                            yield json.dumps({"error": f"API error: {response.status_code} - {error_msg.decode()}"})
+                else:
+                    response = await client.post(url, headers=headers, json=payload)
+                    if response.status_code == 200:
+                        yield response.text
+                    else:
+                        yield json.dumps({"error": f"API error: {response.status_code} - {response.text}"})
+                        
+        except Exception as e:
+            logger.error(f"SiliconFlow chat completion error: {e}")
+            yield json.dumps({"error": f"Request failed: {str(e)}"})
+
+class OpenAICompatibleClient(PlatformClient):
+    """OpenAI兼容客户端"""
+    
+    def __init__(self, config: PlatformConfig):
+        super().__init__(config)
+        # base_url 必须由用户配置，没有默认值
+        self.base_url = config.base_url
+        if not self.base_url:
+            logger.warning("⚠️ [OpenAI Compatible] Base URL未配置")
+    
+    async def get_models(self) -> List[ModelInfo]:
+        """获取OpenAI兼容API模型列表"""
+        logger.info("🔍 [OpenAI Compatible] 开始获取模型列表...")
+        
+        if not self.base_url:
+            logger.warning("⚠️ [OpenAI Compatible] Base URL未配置，跳过获取模型")
+            return []
+        
+        if not self.config.api_key:
+            logger.warning("⚠️ [OpenAI Compatible] API Key未配置，跳过获取模型")
+            return []
+        
+        try:
+            # 确保URL以/结尾
+            base_url = self.base_url.rstrip('/')
+            url = f"{base_url}/v1/models"
+            
+            logger.info(f"🌐 [OpenAI Compatible] 请求URL: {url}")
+            async with httpx.AsyncClient(timeout=self.config.timeout) as client:
+                response = await client.get(
+                    url,
+                    headers={
+                        "Authorization": f"Bearer {self.config.api_key}",
+                        "Content-Type": "application/json"
+                    }
+                )
+                
+                logger.info(f"📡 [OpenAI Compatible] API响应状态: {response.status_code}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    models = []
+                    
+                    logger.info(f"📋 [OpenAI Compatible] 响应数据: {json.dumps(data, indent=2, ensure_ascii=False)}")
+                    
+                    # 解析模型列表
+                    if "data" in data:
+                        for model in data["data"]:
+                            model_id = model.get("id", "")
+                            model_name = model.get("name", model_id)
+                            
+                            model_info = ModelInfo(
+                                id=model_id,
+                                name=model_name,
+                                platform=PlatformType.OPENAI_COMPATIBLE,
+                                description=model.get("description", f"OpenAI兼容模型: {model_id}")
+                            )
+                            models.append(model_info)
+                    else:
+                        # 如果API返回格式不匹配，尝试直接使用响应数据
+                        logger.info("⚠️ [OpenAI Compatible] API响应格式不匹配，尝试直接解析")
+                        if isinstance(data, list):
+                            for model in data:
+                                if isinstance(model, dict):
+                                    model_id = model.get("id", str(model))
+                                    model_info = ModelInfo(
+                                        id=model_id,
+                                        name=model.get("name", model_id),
+                                        platform=PlatformType.OPENAI_COMPATIBLE,
+                                        description=model.get("description", f"OpenAI兼容模型: {model_id}")
+                                    )
+                                    models.append(model_info)
+                        else:
+                            logger.warning("⚠️ [OpenAI Compatible] 无法解析模型数据，请检查API响应格式")
+                    
+                    logger.info(f"✅ [OpenAI Compatible] 成功获取 {len(models)} 个模型")
+                    return models
+                else:
+                    logger.error(f"❌ [OpenAI Compatible] API错误: {response.status_code} - {response.text}")
+                    return []
+                    
+        except Exception as e:
+            logger.error(f"❌ [OpenAI Compatible] 获取模型失败: {e}")
+            return []
+    
+    async def chat_completion(
+        self, 
+        model: str, 
+        messages: List[Dict[str, Any]], 
+        stream: bool = False,
+        **kwargs
+    ) -> AsyncGenerator[str, None]:
+        """OpenAI兼容聊天补全"""
+        if not self.base_url:
+            yield json.dumps({"error": "Base URL not configured"})
+            return
+        
+        if not self.config.api_key:
+            yield json.dumps({"error": "API key not configured"})
+            return
+        
+        # 确保URL以/结尾
+        base_url = self.base_url.rstrip('/')
+        url = f"{base_url}/chat/completions"
+        
+        headers = {
+            "Authorization": f"Bearer {self.config.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": stream,
+            **kwargs
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=self.config.timeout) as client:
+                if stream:
+                    async with client.stream(
+                        "POST", url, headers=headers, json=payload
+                    ) as response:
+                        if response.status_code == 200:
+                            async for line in response.aiter_lines():
+                                if line.strip():
+                                    if line.startswith("data: "):
+                                        data = line[6:]
+                                        if data.strip() == "[DONE]":
+                                            break
+                                        yield data
+                                    else:
+                                        yield line
+                        else:
+                            error_msg = await response.aread()
+                            yield json.dumps({"error": f"API error: {response.status_code} - {error_msg.decode()}"})
+                else:
+                    response = await client.post(url, headers=headers, json=payload)
+                    if response.status_code == 200:
+                        yield response.text
+                    else:
+                        yield json.dumps({"error": f"API error: {response.status_code} - {response.text}"})
+                        
+        except Exception as e:
+            logger.error(f"OpenAI Compatible chat completion error: {e}")
+            yield json.dumps({"error": f"Request failed: {str(e)}"})
+
 class LMStudioClient(PlatformClient):
     """LMStudio客户端"""
     
@@ -556,6 +840,10 @@ class PlatformManager:
             client = OllamaClient(config)
         elif config.platform_type == PlatformType.LMSTUDIO:
             client = LMStudioClient(config)
+        elif config.platform_type == PlatformType.SILICONFLOW:
+            client = SiliconFlowClient(config)
+        elif config.platform_type == PlatformType.OPENAI_COMPATIBLE:
+            client = OpenAICompatibleClient(config)
         else:
             raise ValueError(f"Unsupported platform type: {config.platform_type}")
         

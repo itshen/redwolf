@@ -176,6 +176,8 @@ class APIHookMonitor {
         document.getElementById('test-openrouter').addEventListener('click', () => this.testSinglePlatform('openrouter'));
         document.getElementById('test-ollama').addEventListener('click', () => this.testSinglePlatform('ollama'));
         document.getElementById('test-lmstudio').addEventListener('click', () => this.testSinglePlatform('lmstudio'));
+        document.getElementById('test-siliconflow').addEventListener('click', () => this.testSinglePlatform('siliconflow'));
+        document.getElementById('test-openai_compatible').addEventListener('click', () => this.testSinglePlatform('openai_compatible'));
         
         // 路由模型选择
         const routingModelSelect = document.getElementById('routing-model');
@@ -998,12 +1000,26 @@ class APIHookMonitor {
     }
 
     renderPlatformModels(models) {
-        const platformTypes = ['dashscope', 'openrouter', 'ollama', 'lmstudio'];
+        const platformTypes = ['dashscope', 'openrouter', 'ollama', 'lmstudio', 'siliconflow', 'openai_compatible'];
+        
+        // 添加调试日志：显示所有模型的平台分布
+        const platformCounts = {};
+        models.forEach(model => {
+            platformCounts[model.platform] = (platformCounts[model.platform] || 0) + 1;
+        });
+        console.log('🔍 [Frontend] 所有模型的平台分布:', platformCounts);
         
         platformTypes.forEach(platformType => {
             const modelsDiv = document.getElementById(`${platformType}-models`);
             if (modelsDiv) {
                 const platformModels = models.filter(model => model.platform === platformType);
+                
+                console.log(`🔍 [Frontend] 平台 ${platformType}: 找到 ${platformModels.length} 个模型`);
+                if (platformModels.length > 0) {
+                    // 显示前几个模型名称用于调试
+                    const modelNames = platformModels.slice(0, 3).map(m => m.name).join(', ');
+                    console.log(`🔍 [Frontend] ${platformType} 前几个模型: ${modelNames}${platformModels.length > 3 ? '...' : ''}`);
+                }
                 
                 if (platformModels.length > 0) {
                     modelsDiv.innerHTML = platformModels.map(model => 
@@ -1013,6 +1029,8 @@ class APIHookMonitor {
                 } else {
                     modelsDiv.innerHTML = '<span class="text-gray-500 text-xs">暂无可用模型</span>';
                 }
+            } else {
+                console.log(`⚠️ [Frontend] 未找到平台 ${platformType} 的模型显示容器`);
             }
         });
     }
@@ -1699,7 +1717,7 @@ class APIHookMonitor {
     }
 
     async savePlatformConfigs() {
-        const platforms = ['dashscope', 'openrouter', 'ollama', 'lmstudio'];
+        const platforms = ['dashscope', 'openrouter', 'ollama', 'lmstudio', 'siliconflow', 'openai_compatible'];
         
         for (const platform of platforms) {
             const enabled = document.getElementById(`${platform}-enabled`)?.checked || false;
@@ -1743,8 +1761,8 @@ class APIHookMonitor {
                 const platformElement = item.querySelector('.text-xs.text-gray-500');
                 const platform = platformElement ? platformElement.textContent.trim() : 'unknown';
                 
-                // 检查是否已经有正确的平台前缀（dashscope:, openrouter:, ollama:, lmstudio:）
-                const validPlatforms = ['dashscope', 'openrouter', 'ollama', 'lmstudio'];
+                // 检查是否已经有正确的平台前缀（dashscope:, openrouter:, ollama:, lmstudio:, siliconflow:, openai_compatible:）
+                const validPlatforms = ['dashscope', 'openrouter', 'ollama', 'lmstudio', 'siliconflow', 'openai_compatible'];
                 const hasValidPlatformPrefix = validPlatforms.some(p => modelId.startsWith(p + ':'));
                 
                 if (hasValidPlatformPrefix) {
@@ -3776,6 +3794,10 @@ class APIHookMonitor {
                 return `${record.platform_base_url}/api/chat`;
             } else if (record.target_platform === 'lmstudio') {
                 return `${record.platform_base_url}/v1/chat/completions`;
+            } else if (record.target_platform === 'siliconflow') {
+                return `${record.platform_base_url}/v1/chat/completions`;
+            } else if (record.target_platform === 'openai_compatible') {
+                return `${record.platform_base_url}/chat/completions`;
             } else {
                 return `${record.platform_base_url || 'unknown'}${basePath}`;
             }
