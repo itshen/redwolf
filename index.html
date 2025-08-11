@@ -820,7 +820,7 @@
             font-weight: 500 !important;
         }
         
-        /* 全局直连模式选中时的高亮 */
+        /* 多平台转发模式选中时的高亮 */
         #label-global-direct:has(input:checked) {
             background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%);
             border: 2px solid #10b981;
@@ -1024,7 +1024,7 @@
                             <label id="label-global-direct" class="work-mode-label flex items-center p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-100 transition-all duration-200">
                                 <input type="radio" name="work-mode" value="global_direct" id="mode-global-direct" class="mr-2 text-green-600">
                                 <div>
-                                    <div class="text-sm font-medium text-gray-900">全局直连模式</div>
+                                    <div class="text-sm font-medium text-gray-900">多平台转发模式</div>
                                     <div class="text-xs text-gray-500">手动排序控制</div>
                                 </div>
                             </label>
@@ -1049,7 +1049,7 @@
                             Claude Code模式
                         </button>
                         <button id="tab-global-direct" class="config-tab whitespace-nowrap py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700">
-                            全局直连模式
+                            多平台转发模式
                         </button>
                         <button id="tab-smart-routing" class="config-tab whitespace-nowrap py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700">
                             小模型路由模式
@@ -1382,13 +1382,13 @@
                         </div>
                     </div>
 
-                    <!-- 全局直连模式面板 -->
+                    <!-- 多平台转发模式面板 -->
                     <div id="panel-global-direct" class="config-panel hidden space-y-4">
                         <div class="bg-green-50 border border-green-200 rounded-lg p-4">
                             <div class="flex items-center justify-between mb-2">
                                 <div class="flex items-center">
                                     <div class="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-                                    <h4 class="text-lg font-medium text-green-900">全局直连模式</h4>
+                                    <h4 class="text-lg font-medium text-green-900">多平台转发模式</h4>
                                 </div>
                                 <div id="global-direct-status" class="px-2 py-1 text-xs rounded-full bg-gray-200 text-gray-600">
                                     未启用
@@ -1971,7 +1971,7 @@
                                 <div class="flex items-start space-x-2">
                                     <span class="text-green-500">🟢</span>
                                     <div>
-                                        <span class="font-medium">全局直连模式</span>
+                                        <span class="font-medium">多平台转发模式</span>
                                         <div class="text-xs text-gray-500">手动控制，支持拖拽排序和优先级</div>
                                     </div>
                                 </div>

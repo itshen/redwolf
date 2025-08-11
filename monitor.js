@@ -485,7 +485,7 @@ class APIHookMonitor {
             this.updatePlatformStatus();
             this.loadPlatformModels();
         } else if (tabName === 'global-direct') {
-            // 全局直连模式：加载模型列表和平台状态
+            // 多平台转发模式：加载模型列表和平台状态
             this.loadGlobalDirectModels();
             this.updateGlobalPlatformStatus();
         } else if (tabName === 'smart-routing') {
@@ -1675,9 +1675,9 @@ class APIHookMonitor {
                     break;
                 
                 case 'global_direct':
-                    // 全局直连模式：启用多平台转发
+                    // 多平台转发模式：启用多平台转发
                     config.use_multi_platform = true;
-                    console.log('📋 [Frontend] 全局直连模式：启用多平台转发');
+                    console.log('📋 [Frontend] 多平台转发模式：启用多平台转发');
                     await this.savePlatformConfigs();
                     await this.saveGlobalDirectConfig();
                     break;
@@ -3024,7 +3024,7 @@ class APIHookMonitor {
     }
 
     updateGlobalPlatformStatus() {
-        console.log('📊 [Frontend] 更新全局直连模式的平台状态');
+        console.log('📊 [Frontend] 更新多平台转发模式的平台状态');
         // 平台状态显示已删除
     }
 
@@ -3085,7 +3085,7 @@ class APIHookMonitor {
     updateTopStatusDisplay(selectedMode) {
         const modeNames = {
             'claude_code': 'Claude Code模式',
-            'global_direct': '全局直连模式',
+            'global_direct': '多平台转发模式',
             'smart_routing': '小模型路由模式'
         };
         
@@ -6219,7 +6219,7 @@ class APIHookMonitor {
         // 基础状态 - 将英文工作模式转换为中文显示
         const modeNames = {
             'claude_code': 'Claude Code模式',
-            'global_direct': '全局直连模式',
+            'global_direct': '多平台转发模式',
             'smart_routing': '小模型路由模式'
         };
         const workModeDisplay = modeNames[statusData.workMode] || statusData.workMode || '--';

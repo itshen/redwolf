@@ -1,6 +1,6 @@
 """
 智能路由系统
-支持小模型路由模式和全局直连模式
+支持小模型路由模式和多平台转发模式
 """
 
 import json
@@ -22,7 +22,7 @@ class RoutingMode(Enum):
     """路由模式"""
     CLAUDE_CODE = "claude_code"  # 原有的Claude Code API
     SMART_ROUTING = "smart_routing"  # 小模型路由模式
-    GLOBAL_DIRECT = "global_direct"  # 全局直连模式
+    GLOBAL_DIRECT = "global_direct"  # 多平台转发模式
 
 @dataclass
 class RoutingResult:
