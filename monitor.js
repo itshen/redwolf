@@ -3097,12 +3097,21 @@ class APIHookMonitor {
         
         // 更新首页右上角工作模式显示
         const currentModeElement = document.getElementById('current-work-mode');
+        console.log(`🔍 [Frontend] 尝试更新右上角状态，模式: ${selectedMode}, 元素存在: ${!!currentModeElement}`);
+        
         if (currentModeElement) {
-            currentModeElement.textContent = modeNames[selectedMode] || selectedMode;
-            currentModeElement.className = `ml-1 px-2 py-1 ${modeColors[selectedMode] || 'bg-gray-100 text-gray-800'} text-xs font-medium rounded`;
+            const newText = modeNames[selectedMode] || selectedMode;
+            const newClassName = `ml-1 px-2 py-1 ${modeColors[selectedMode] || 'bg-gray-100 text-gray-800'} text-xs font-medium rounded`;
+            
+            currentModeElement.textContent = newText;
+            currentModeElement.className = newClassName;
+            
+            console.log(`✅ [Frontend] 右上角状态已更新: ${newText}, 样式: ${newClassName}`);
+        } else {
+            console.error(`❌ [Frontend] 找不到 current-work-mode 元素！`);
         }
         
-        console.log(`📊 [Frontend] 首页状态条已更新: ${modeNames[selectedMode]}`);
+        console.log(`📊 [Frontend] 首页状态条更新完成: ${modeNames[selectedMode]}`);
     }
 
     loadWorkMode(currentMode) {
@@ -3129,13 +3138,18 @@ class APIHookMonitor {
 
     updateConfigDisplay(config) {
         if (config) {
+            // 🔄 更新右上角的工作模式显示
+            const currentMode = config.current_work_mode || 'claude_code';
+            this.updateTopStatusDisplay(currentMode);
+            
             // 更新平台状态
-            if (this.currentPlatformStatus) {
-                this.currentPlatformStatus.textContent = '正常运行';
-                this.currentPlatformStatus.className = 'ml-1 px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded';
+            const currentStatusElement = document.getElementById('current-platform-status');
+            if (currentStatusElement) {
+                currentStatusElement.textContent = '正常运行';
+                currentStatusElement.className = 'ml-1 px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded';
             }
             
-            console.log(`✅ [Frontend] 加载配置成功，更新状态条显示`);
+            console.log(`✅ [Frontend] 页面初始化：更新右上角状态显示，工作模式: ${currentMode}`);
         }
     }
 
