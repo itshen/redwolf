@@ -85,7 +85,7 @@ class SmartRouter:
                 platform_type, model_id = self._parse_model_spec(model_spec)
                 client = self.platform_manager.get_platform(platform_type)
                 
-                if client and await self._test_model_availability(client, model_id):
+                if client:
                     return RoutingResult(
                         success=True,
                         platform_type=platform_type,
@@ -93,7 +93,7 @@ class SmartRouter:
                         scene_name=scene.name
                     )
             except Exception as e:
-                logger.error(f"Failed to test model {model_spec}: {e}")
+                logger.error(f"Failed to parse model {model_spec}: {e}")
                 continue
         
         return RoutingResult(
@@ -176,22 +176,6 @@ class SmartRouter:
         platform_type = PlatformType(platform_str)
         
         return platform_type, model_id
-    
-    async def _test_model_availability(self, client: PlatformClient, model_id: str) -> bool:
-        """测试模型可用性"""
-        try:
-            # 发送一个简单的测试请求
-            test_messages = [{"role": "user", "content": "test"}]
-            async for chunk in client.chat_completion(model_id, test_messages, stream=False):
-                try:
-                    data = json.loads(chunk)
-                    if "error" not in data:
-                        return True
-                except json.JSONDecodeError:
-                    pass
-            return False
-        except Exception:
-            return False
 
 class GlobalDirectRouter:
     """全局直连路由器"""
@@ -221,14 +205,14 @@ class GlobalDirectRouter:
                 platform_type, model_id = self._parse_model_spec(model_spec)
                 client = self.platform_manager.get_platform(platform_type)
                 
-                if client and await self._test_model_availability(client, model_id):
+                if client:
                     return RoutingResult(
                         success=True,
                         platform_type=platform_type,
                         model_id=model_id
                     )
             except Exception as e:
-                logger.error(f"Failed to test model {model_spec}: {e}")
+                logger.error(f"Failed to parse model {model_spec}: {e}")
                 continue
         
         return RoutingResult(
@@ -245,22 +229,6 @@ class GlobalDirectRouter:
         platform_type = PlatformType(platform_str)
         
         return platform_type, model_id
-    
-    async def _test_model_availability(self, client: PlatformClient, model_id: str) -> bool:
-        """测试模型可用性"""
-        try:
-            # 发送一个简单的测试请求
-            test_messages = [{"role": "user", "content": "test"}]
-            async for chunk in client.chat_completion(model_id, test_messages, stream=False):
-                try:
-                    data = json.loads(chunk)
-                    if "error" not in data:
-                        return True
-                except json.JSONDecodeError:
-                    pass
-            return False
-        except Exception:
-            return False
 
 class RoutingManager:
     """路由管理器"""
